@@ -78,8 +78,8 @@ def test_required_partial_indexes_and_constraints_exist() -> None:
 def test_key_relationship_cardinality_and_seed_roles() -> None:
     user_mapper = Base.registry.mappers
     user = next(mapper for mapper in user_mapper if mapper.local_table.name == "users")
-    assert user.relationships["student_profile"].uselist is False
-    assert user.relationships["staff_profile"].uselist is False
+    assert user.relationships["student_profiles"].uselist is True
+    assert user.relationships["staff_profiles"].uselist is True
 
     grant_application = next(
         mapper for mapper in Base.registry.mappers if mapper.local_table.name == "grant_applications"

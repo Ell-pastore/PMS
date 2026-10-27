@@ -48,10 +48,10 @@ class ProgressReport(TimestampMixin, Base):
             name="fk_progress_reports_project_university",
         ),
         ForeignKeyConstraint(
-            ["milestone_id", "university_id"],
-            ["project_milestones.id", "project_milestones.university_id"],
+            ["milestone_id", "project_id", "university_id"],
+            ["project_milestones.id", "project_milestones.project_id", "project_milestones.university_id"],
             ondelete="RESTRICT",
-            name="fk_progress_reports_milestone_university",
+            name="fk_progress_reports_milestone_project_university",
         ),
         ForeignKeyConstraint(
             ["submitter_id", "university_id"],

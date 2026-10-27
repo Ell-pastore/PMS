@@ -48,10 +48,10 @@ class DepartmentLeadership(TimestampMixin, Base):
             name="fk_department_leadership_department_university",
         ),
         ForeignKeyConstraint(
-            ["staff_id", "university_id"],
-            ["staff_profiles.id", "staff_profiles.university_id"],
+            ["staff_id", "department_id", "university_id"],
+            ["staff_profiles.id", "staff_profiles.department_id", "staff_profiles.university_id"],
             ondelete="RESTRICT",
-            name="fk_department_leadership_staff_university",
+            name="fk_department_leadership_staff_department_university",
         ),
         ForeignKeyConstraint(
             ["appointed_by_id", "university_id"],

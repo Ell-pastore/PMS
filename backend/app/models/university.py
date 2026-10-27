@@ -51,6 +51,14 @@ class University(TimestampMixin, Base):
     settings: Mapped[Optional["UniversitySettings"]] = relationship(back_populates="university", uselist=False, passive_deletes=True)
 
 class UniversityMembership(TimestampMixin, Base):
+    """A university membership whose active state is an authorization concern.
+
+    Foreign keys intentionally validate that historical records point to a
+    membership that exists; service operations must separately require
+    ``is_active`` when granting access or creating new university-scoped work.
+    Deactivation therefore preserves historical references.
+    """
+
     __tablename__ = "university_memberships"
     __table_args__ = (
         UniqueConstraint("university_id", "user_id", name="uq_university_memberships_university_user"),

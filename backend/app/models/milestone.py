@@ -92,6 +92,7 @@ class ProjectMilestone(TimestampMixin, Base):
             name="fk_project_milestones_created_by_membership",
         ),
         UniqueConstraint("id", "university_id", name="uq_project_milestones_id_university"),
+        UniqueConstraint("id", "project_id", "university_id", name="uq_project_milestones_id_project_university"),
         UniqueConstraint("project_id", "sequence_number", name="uq_project_milestones_sequence"),
         CheckConstraint("sequence_number > 0", name="ck_project_milestones_sequence"),
         CheckConstraint("status IN ('pending', 'in_progress', 'submitted', 'approved', 'revision_requested', 'overdue', 'completed', 'cancelled')", name="ck_project_milestones_status"),

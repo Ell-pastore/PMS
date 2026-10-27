@@ -55,6 +55,7 @@ class StudentProfile(TimestampMixin, Base):
             ondelete="RESTRICT",
             name="fk_student_profiles_department_university",
         ),
+        UniqueConstraint("user_id", "university_id", name="uq_student_profiles_user_university"),
         UniqueConstraint("id", "university_id", name="uq_student_profiles_id_university"),
         UniqueConstraint("university_id", "student_id", name="uq_student_profiles_university_student_id"),
         CheckConstraint(
@@ -71,7 +72,6 @@ class StudentProfile(TimestampMixin, Base):
     user_id: Mapped[int] = mapped_column(
         ForeignKey("users.id", ondelete="RESTRICT"),
         nullable=False,
-        unique=True,
     )
     university_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("universities.id", ondelete="RESTRICT"),
@@ -92,5 +92,5 @@ class StudentProfile(TimestampMixin, Base):
     )
     phone_number: Mapped[Optional[str]] = mapped_column(String(32), nullable=True)
 
-    user: Mapped["User"] = relationship(back_populates="student_profile")
+    user: Mapped["User"] = relationship(back_populates="student_profiles")
     department: Mapped["Department"] = relationship(back_populates="student_profiles")

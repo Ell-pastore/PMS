@@ -83,14 +83,12 @@ class User(TimestampMixin, Base):
         foreign_keys="UserRole.user_id",
         passive_deletes=True,
     )
-    student_profile: Mapped[Optional["StudentProfile"]] = relationship(
+    student_profiles: Mapped[list["StudentProfile"]] = relationship(
         back_populates="user",
-        uselist=False,
         passive_deletes=True,
     )
-    staff_profile: Mapped[Optional["StaffProfile"]] = relationship(
+    staff_profiles: Mapped[list["StaffProfile"]] = relationship(
         back_populates="user",
-        uselist=False,
         passive_deletes=True,
     )
     account_verifications: Mapped[list["AccountVerification"]] = relationship(

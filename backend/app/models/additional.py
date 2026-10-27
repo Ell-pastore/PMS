@@ -10,6 +10,7 @@ from .approval import (
     ApprovalAction,
     ApprovalInstance,
     ApprovalWorkflow,
+    ApprovalWorkflowVersion,
     ApprovalWorkflowStep,
 )
 from .audit_log import AuditLog
@@ -74,6 +75,7 @@ __all__ = [
     "ApprovalAction",
     "ApprovalInstance",
     "ApprovalWorkflow",
+    "ApprovalWorkflowVersion",
     "ApprovalWorkflowStep",
     "AuditLog",
     "DepartmentLeadership",

@@ -55,7 +55,9 @@ class StaffProfile(TimestampMixin, Base):
             ondelete="RESTRICT",
             name="fk_staff_profiles_department_university",
         ),
+        UniqueConstraint("user_id", "university_id", name="uq_staff_profiles_user_university"),
         UniqueConstraint("id", "university_id", name="uq_staff_profiles_id_university"),
+        UniqueConstraint("id", "department_id", "university_id", name="uq_staff_profiles_id_department_university"),
         UniqueConstraint("university_id", "staff_id", name="uq_staff_profiles_university_staff_id"),
         CheckConstraint(
             "gender IS NULL OR gender IN ('female', 'male', 'non_binary', 'undisclosed')",
@@ -67,7 +69,6 @@ class StaffProfile(TimestampMixin, Base):
     user_id: Mapped[int] = mapped_column(
         ForeignKey("users.id", ondelete="RESTRICT"),
         nullable=False,
-        unique=True,
     )
     university_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("universities.id", ondelete="RESTRICT"),
@@ -84,5 +85,5 @@ class StaffProfile(TimestampMixin, Base):
     gender: Mapped[Optional[str]] = mapped_column(String(32), nullable=True)
     phone_number: Mapped[Optional[str]] = mapped_column(String(32), nullable=True)
 
-    user: Mapped["User"] = relationship(back_populates="staff_profile")
+    user: Mapped["User"] = relationship(back_populates="staff_profiles")
     department: Mapped["Department"] = relationship(back_populates="staff_profiles")
