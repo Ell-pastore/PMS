@@ -1,0 +1,107 @@
+# Python environments
+.venv/
+venv/
+env/
+
+# Environment variables and secrets
+.env
+.env.*
+!.env.example
+
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Testing and coverage
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+htmlcov/
+
+# Build artifacts
+build/
+dist/
+*.egg-info/
+
+# Logs
+*.log
+logs/
+
+# Editors and operating system
+.DS_Store
+.idea/
+.vscode/
+
+# Temporary files
+*.tmp
+*.swp
+*.bak
+
+# Local databases and backups
+*.db
+*.sqlite
+*.sqlite3
+*.dump
+*.backup
+*.sql
+
+# Test and local configuration
+.env.test
+.env.local
+EOF
+
+**Important:** The `.env.example` exception allows you to publish a template containing placeholder values, never actual passwords or API keys.
+
+Paste the content into your terminal using this command:
+
+```bash
+cd /Users/apple/Desktop/PMS
+
+cat > .gitignore <<'EOF'
+.venv/
+venv/
+env/
+
+.env
+.env.*
+!.env.example
+
+__pycache__/
+*.py[cod]
+*$py.class
+
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+htmlcov/
+
+build/
+dist/
+*.egg-info/
+
+*.log
+logs/
+
+.DS_Store
+.idea/
+.vscode/
+
+*.tmp
+*.swp
+*.bak
+
+*.db
+*.sqlite
+*.sqlite3
+*.dump
+*.backup
+*.sql
+
+.env.test
+.env.local
+EOF
