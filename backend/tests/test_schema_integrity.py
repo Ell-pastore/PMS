@@ -62,8 +62,8 @@ def test_registry_and_mapper_configuration_without_warnings() -> None:
     with warnings.catch_warnings():
         warnings.simplefilter("error", SAWarning)
         configure_mappers()
-    assert len(Base.metadata.tables) == 59
-    assert len(list(Base.registry.mappers)) == 59
+    assert len(Base.metadata.tables) == 60
+    assert len(list(Base.registry.mappers)) == 60
 
 
 def test_profiles_are_university_scoped_collections() -> None:
@@ -336,8 +336,8 @@ def test_primary_key_layout_includes_one_justified_uuid_version_table() -> None:
         "student_profiles",
         "staff_profiles",
     }
-    assert len(Base.metadata.tables) == 59
-    assert sum(isinstance(table.c.id.type, Uuid) for table in Base.metadata.tables.values()) == 52
+    assert len(Base.metadata.tables) == 60
+    assert sum(isinstance(table.c.id.type, Uuid) for table in Base.metadata.tables.values()) == 53
     for table_name, table in Base.metadata.tables.items():
         expected_type = Integer if table_name in integer_tables else Uuid
         assert isinstance(table.c.id.type, expected_type)

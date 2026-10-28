@@ -1,0 +1,1360 @@
+// PMS schema generated from backend.app.models.Base.metadata.
+// Current registry: 60 application tables (52 from the complete-schema revision, 7 original tables, and notification_preferences added later).
+// DBML cannot represent PostgreSQL triggers/functions, ORM event guards, partial-index predicates, server-side trigger behavior, or Alembic migration history; these are reported separately.
+
+Table account_verifications {
+  id uuid [pk, not null, note: 'ORM default: uuid4']
+  user_id int [not null]
+  verification_type varchar(32) [not null]
+  token_digest varchar(255) [not null]
+  expires_at timestamptz [not null]
+  verified_at timestamptz
+  created_at timestamptz [not null, default: `now()`]
+  indexes {
+  (token_digest) [unique]
+  (user_id, expires_at) [name: 'ix_account_verifications_user_expires']
+  }
+}
+
+Table alert_events {
+  id uuid [pk, not null, note: 'ORM default: uuid4']
+  university_id uuid [not null]
+  rule_id uuid [not null]
+  alert_type varchar(64) [not null]
+  target_entity_type varchar(128) [not null]
+  target_entity_id uuid [not null]
+  severity varchar(16) [not null]
+  message text [not null]
+  status varchar(32) [not null, default: 'active']
+  detected_at timestamptz [not null, default: `now()`]
+  resolved_at timestamptz
+  indexes {
+  (id, university_id) [unique, name: 'uq_alert_events_id_university']
+  (status, detected_at) [name: 'ix_alert_events_status_detected']
+  }
+  checks {
+    `severity IN ('info', 'warning', 'critical')` [name: 'ck_alert_events_severity']
+    `status IN ('active', 'acknowledged', 'resolved', 'dismissed')` [name: 'ck_alert_events_status']
+  }
+}
+
+Table alert_rules {
+  id uuid [pk, not null, note: 'ORM default: uuid4']
+  university_id uuid [not null]
+  department_id int
+  rule_type varchar(64) [not null]
+  threshold_value int
+  configuration jsonb [not null, default: '{}']
+  is_enabled boolean [not null, default: true]
+  created_by_id int [not null]
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`, note: 'ORM onupdate: now()']
+  indexes {
+  (id, university_id) [unique, name: 'uq_alert_rules_id_university']
+  }
+  checks {
+    `threshold_value IS NULL OR threshold_value >= 0` [name: 'ck_alert_rules_threshold']
+    `rule_type IN ('student_inactivity', 'overdue_milestone', 'duplicate_topic')` [name: 'ck_alert_rules_type']
+  }
+}
+
+Table approval_actions {
+  id uuid [pk, not null, note: 'ORM default: uuid4']
+  instance_id uuid [not null]
+  step_id uuid [not null]
+  workflow_version_id uuid [not null]
+  workflow_id uuid [not null]
+  university_id uuid [not null]
+  acting_user_id int [not null]
+  decision varchar(32) [not null]
+  comments text
+  created_at timestamptz [not null, default: `now()`]
+}
+
+Table approval_instances {
+  id uuid [pk, not null, note: 'ORM default: uuid4']
+  workflow_version_id uuid [not null]
+  workflow_id uuid [not null]
+  university_id uuid [not null]
+  target_entity_type varchar(128) [not null]
+  target_entity_id uuid [not null]
+  status varchar(32) [not null, default: 'pending']
+  initiated_by_id int [not null]
+  started_at timestamptz [not null, default: `now()`]
+  completed_at timestamptz
+  indexes {
+  (id, workflow_version_id, workflow_id, university_id) [unique, name: 'uq_approval_instances_id_version_workflow_university']
+  (target_entity_type, target_entity_id) [name: 'ix_approval_instances_target']
+  }
+  checks {
+    `status IN ('pending', 'in_progress', 'approved', 'rejected', 'cancelled')` [name: 'ck_approval_instances_status']
+  }
+}
+
+Table approval_workflow_steps {
+  id uuid [pk, not null, note: 'ORM default: uuid4']
+  workflow_version_id uuid [not null]
+  workflow_id uuid [not null]
+  university_id uuid [not null]
+  step_number int [not null]
+  name varchar(255) [not null]
+  required_role_id int
+  required_approvals int [not null, default: 1]
+  is_mandatory boolean [not null, default: true]
+  indexes {
+  (id, workflow_version_id, workflow_id, university_id) [unique, name: 'uq_approval_workflow_steps_id_version_workflow_university']
+  (workflow_version_id, step_number) [unique, name: 'uq_approval_workflow_steps_version_number']
+  }
+  checks {
+    `step_number > 0` [name: 'ck_approval_workflow_steps_number']
+    `required_approvals > 0` [name: 'ck_approval_workflow_steps_required']
+  }
+}
+
+Table approval_workflow_versions {
+  id uuid [pk, not null, note: 'ORM default: uuid4']
+  workflow_id uuid [not null]
+  university_id uuid [not null]
+  version_number int [not null]
+  publication_state varchar(32) [not null, default: 'draft']
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`, note: 'ORM onupdate: now()']
+  indexes {
+  (workflow_id, version_number) [unique, name: 'uq_approval_workflow_versions_workflow_number']
+  (id, workflow_id, university_id) [unique, name: 'uq_approval_workflow_versions_id_workflow_university']
+  }
+  checks {
+    `version_number > 0` [name: 'ck_approval_workflow_versions_number']
+    `publication_state IN ('draft', 'published')` [name: 'ck_approval_workflow_versions_publication_state']
+  }
+}
+
+Table approval_workflows {
+  id uuid [pk, not null, note: 'ORM default: uuid4']
+  university_id uuid [not null]
+  workflow_type varchar(128) [not null]
+  department_id int
+  active_version_id uuid
+  created_by_id int [not null]
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`, note: 'ORM onupdate: now()']
+  // PostgreSQL partial-index predicate for uq_approval_workflows_department_scope: department_id IS NOT NULL
+  // PostgreSQL partial-index predicate for uq_approval_workflows_university_scope: department_id IS NULL
+  indexes {
+  (id, university_id) [unique, name: 'uq_approval_workflows_id_university']
+  (workflow_type, university_id, department_id) [unique, name: 'uq_approval_workflows_department_scope']
+  (workflow_type, university_id) [unique, name: 'uq_approval_workflows_university_scope']
+  }
+}
+
+Table audit_logs {
+  id uuid [pk, not null, note: 'ORM default: uuid4']
+  university_id uuid [not null]
+  acting_user_id int
+  action varchar(128) [not null]
+  entity_type varchar(128) [not null]
+  entity_uuid uuid
+  entity_integer int
+  event_at timestamptz [not null, default: `now()`]
+  request_id varchar(128)
+  metadata jsonb [not null, default: '{}']
+  // PostgreSQL partial-index predicate for ix_audit_logs_entity_integer_event: entity_integer IS NOT NULL
+  // PostgreSQL partial-index predicate for ix_audit_logs_entity_uuid_event: entity_uuid IS NOT NULL
+  indexes {
+  (entity_type, entity_integer, event_at) [name: 'ix_audit_logs_entity_integer_event']
+  (entity_type, entity_uuid, event_at) [name: 'ix_audit_logs_entity_uuid_event']
+  (request_id) [name: 'ix_audit_logs_request_id']
+  }
+  checks {
+    `(entity_uuid IS NULL AND entity_integer IS NULL)
+            OR (
+                entity_uuid IS NULL
+                AND entity_integer IS NOT NULL
+                AND entity_type IN (
+                    'users', 'roles', 'user_roles', 'faculties',
+                    'departments', 'student_profiles', 'staff_profiles'
+                )
+            )
+            OR (
+                entity_uuid IS NOT NULL
+                AND entity_integer IS NULL
+                AND entity_type NOT IN (
+                    'users', 'roles', 'user_roles', 'faculties',
+                    'departments', 'student_profiles', 'staff_profiles'
+                )
+            )` [name: 'ck_audit_logs_entity_identifier_type']
+  }
+}
+
+Table department_leadership {
+  id uuid [pk, not null, note: 'ORM default: uuid4']
+  university_id uuid [not null]
+  department_id int [not null]
+  staff_id int [not null]
+  appointed_by_id int [not null]
+  started_at timestamptz [not null]
+  ended_at timestamptz
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`, note: 'ORM onupdate: now()']
+  // PostgreSQL partial-index predicate for uq_department_leadership_active: ended_at IS NULL
+  indexes {
+  (department_id) [unique, name: 'uq_department_leadership_active']
+  }
+  checks {
+    `ended_at IS NULL OR ended_at >= started_at` [name: 'ck_department_leadership_dates']
+  }
+}
+
+Table department_settings {
+  id uuid [pk, not null, note: 'ORM default: uuid4']
+  university_id uuid [not null]
+  department_id int [not null]
+  max_supervisors_per_project int
+  max_active_projects_per_student int
+  max_active_supervisees_per_supervisor int
+  student_inactivity_days int
+  milestone_reminder_days int
+  default_proposal_review_days int
+  updated_by_id int
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`, note: 'ORM onupdate: now()']
+  indexes {
+  (department_id) [unique, name: 'uq_department_settings_department']
+  }
+  checks {
+    `student_inactivity_days IS NULL OR student_inactivity_days > 0` [name: 'ck_department_settings_inactivity']
+    `max_active_projects_per_student IS NULL OR max_active_projects_per_student > 0` [name: 'ck_department_settings_projects']
+    `milestone_reminder_days IS NULL OR milestone_reminder_days >= 0` [name: 'ck_department_settings_reminder']
+    `default_proposal_review_days IS NULL OR default_proposal_review_days > 0` [name: 'ck_department_settings_review']
+    `max_active_supervisees_per_supervisor IS NULL OR max_active_supervisees_per_supervisor > 0` [name: 'ck_department_settings_supervisees']
+    `max_supervisors_per_project IS NULL OR max_supervisors_per_project > 0` [name: 'ck_department_settings_supervisors']
+  }
+}
+
+Table departments {
+  id int [pk, not null]
+  name varchar(255) [not null]
+  code varchar(64) [not null]
+  description text
+  faculty_id int [not null]
+  university_id uuid [not null]
+  is_active boolean [not null, default: true]
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`, note: 'ORM onupdate: now()']
+  indexes {
+  (id, university_id) [unique, name: 'uq_departments_id_university']
+  (university_id, faculty_id, name) [unique, name: 'uq_departments_faculty_name']
+  (university_id, faculty_id, code) [unique, name: 'uq_departments_faculty_code']
+  }
+}
+
+Table document_attachments {
+  id uuid [pk, not null, note: 'ORM default: uuid4']
+  university_id uuid [not null]
+  stored_file_id uuid [not null]
+  proposal_id uuid
+  project_id uuid
+  progress_report_id uuid
+  grant_application_id uuid
+  document_type varchar(64) [not null]
+  uploader_id int [not null]
+  created_at timestamptz [not null, default: `now()`]
+  indexes {
+  (project_id) [name: 'ix_document_attachments_target_project']
+  (proposal_id) [name: 'ix_document_attachments_target_proposal']
+  }
+  checks {
+    `num_nonnulls(proposal_id, project_id, progress_report_id, grant_application_id) = 1` [name: 'ck_document_attachments_one_target']
+  }
+}
+
+Table duplicate_topic_candidates {
+  id uuid [pk, not null, note: 'ORM default: uuid4']
+  university_id uuid [not null]
+  alert_event_id uuid [not null]
+  topic_a_id uuid [not null]
+  topic_b_id uuid [not null]
+  review_status varchar(32) [not null, default: 'pending']
+  reviewed_by_id int
+  reviewed_at timestamptz
+  indexes {
+  (alert_event_id) [unique, name: 'uq_duplicate_topic_candidates_alert']
+  (alert_event_id) [unique]
+  }
+  checks {
+    `topic_a_id < topic_b_id` [name: 'ck_duplicate_topic_candidates_order']
+  }
+}
+
+Table faculties {
+  id int [pk, not null]
+  name varchar(255) [not null]
+  code varchar(64) [not null]
+  university_id uuid [not null]
+  description text
+  is_active boolean [not null, default: true]
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`, note: 'ORM onupdate: now()']
+  indexes {
+  (university_id, code) [unique, name: 'uq_faculties_university_code']
+  (id, university_id) [unique, name: 'uq_faculties_id_university']
+  }
+}
+
+Table grant_application_participants {
+  id uuid [pk, not null, note: 'ORM default: uuid4']
+  university_id uuid [not null]
+  application_id uuid [not null]
+  user_id int [not null]
+  participation_role varchar(64) [not null]
+  created_at timestamptz [not null, default: `now()`]
+  indexes {
+  (application_id, user_id) [unique, name: 'uq_grant_application_participants_application_user']
+  }
+}
+
+Table grant_application_reviews {
+  id uuid [pk, not null, note: 'ORM default: uuid4']
+  university_id uuid [not null]
+  application_id uuid [not null]
+  reviewer_id int [not null]
+  decision varchar(32) [not null]
+  recommended_amount decimal(14,2)
+  comments text
+  reviewed_at timestamptz [not null, default: `now()`]
+  checks {
+    `recommended_amount IS NULL OR recommended_amount >= 0` [name: 'ck_grant_application_reviews_amount']
+    `decision IN ('approved', 'rejected', 'revision_requested', 'commented')` [name: 'ck_grant_application_reviews_decision']
+  }
+}
+
+Table grant_application_status_history {
+  id uuid [pk, not null, note: 'ORM default: uuid4']
+  university_id uuid [not null]
+  application_id uuid [not null]
+  previous_status varchar(32)
+  new_status varchar(32) [not null]
+  actor_id int [not null]
+  reason text
+  created_at timestamptz [not null, default: `now()`]
+}
+
+Table grant_applications {
+  id uuid [pk, not null, note: 'ORM default: uuid4']
+  university_id uuid [not null]
+  opportunity_id uuid [not null]
+  applicant_id int [not null]
+  project_id uuid
+  title varchar(500) [not null]
+  proposal text [not null]
+  requested_amount decimal(14,2) [not null]
+  currency varchar(3) [not null]
+  status varchar(32) [not null, default: 'draft']
+  submitted_at timestamptz
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`, note: 'ORM onupdate: now()']
+  indexes {
+  (id, university_id) [unique, name: 'uq_grant_applications_id_university']
+  (opportunity_id, status) [name: 'ix_grant_applications_opportunity_status']
+  }
+  checks {
+    `requested_amount >= 0` [name: 'ck_grant_applications_amount']
+    `status IN ('draft', 'submitted', 'under_review', 'approved', 'rejected', 'withdrawn')` [name: 'ck_grant_applications_status']
+  }
+}
+
+Table grant_awards {
+  id uuid [pk, not null, note: 'ORM default: uuid4']
+  university_id uuid [not null]
+  application_id uuid [not null]
+  award_reference varchar(128) [not null]
+  awarded_amount decimal(14,2) [not null]
+  currency varchar(3) [not null]
+  award_start_date date [not null]
+  award_end_date date [not null]
+  status varchar(32) [not null, default: 'active']
+  approved_by_id int [not null]
+  approved_at timestamptz [not null, default: `now()`]
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`, note: 'ORM onupdate: now()']
+  indexes {
+  (award_reference) [unique]
+  (award_reference) [unique, name: 'uq_grant_awards_reference']
+  (application_id) [unique, name: 'uq_grant_awards_application']
+  (id, university_id) [unique, name: 'uq_grant_awards_id_university']
+  (application_id) [unique]
+  }
+  checks {
+    `awarded_amount >= 0` [name: 'ck_grant_awards_amount']
+    `award_end_date >= award_start_date` [name: 'ck_grant_awards_dates']
+    `status IN ('active', 'closed', 'cancelled')` [name: 'ck_grant_awards_status']
+  }
+}
+
+Table grant_expenditures {
+  id uuid [pk, not null, note: 'ORM default: uuid4']
+  university_id uuid [not null]
+  award_id uuid [not null]
+  project_id uuid
+  description text [not null]
+  amount decimal(14,2) [not null]
+  currency varchar(3) [not null]
+  expenditure_date date [not null]
+  reference_number varchar(128)
+  status varchar(32) [not null, default: 'draft']
+  recorded_by_id int [not null]
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`, note: 'ORM onupdate: now()']
+  indexes {
+  (award_id, expenditure_date) [name: 'ix_grant_expenditures_award_date']
+  }
+  checks {
+    `amount >= 0` [name: 'ck_grant_expenditures_amount']
+    `status IN ('draft', 'submitted', 'approved', 'rejected', 'paid', 'voided')` [name: 'ck_grant_expenditures_status']
+  }
+}
+
+Table grant_opportunities {
+  id uuid [pk, not null, note: 'ORM default: uuid4']
+  university_id uuid [not null]
+  title varchar(500) [not null]
+  description text
+  funding_organization varchar(255) [not null]
+  eligibility_criteria text
+  application_opens_at timestamptz [not null]
+  application_closes_at timestamptz [not null]
+  min_funding_amount decimal(14,2) [not null]
+  max_funding_amount decimal(14,2)
+  currency varchar(3) [not null]
+  status varchar(32) [not null, default: 'draft']
+  created_by_id int [not null]
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`, note: 'ORM onupdate: now()']
+  indexes {
+  (id, university_id) [unique, name: 'uq_grant_opportunities_id_university']
+  }
+  checks {
+    `application_closes_at >= application_opens_at` [name: 'ck_grant_opportunities_dates']
+    `max_funding_amount IS NULL OR max_funding_amount >= min_funding_amount` [name: 'ck_grant_opportunities_max_amount']
+    `min_funding_amount >= 0` [name: 'ck_grant_opportunities_min_amount']
+    `status IN ('draft', 'open', 'closed', 'awarded', 'cancelled')` [name: 'ck_grant_opportunities_status']
+  }
+}
+
+Table grant_progress_reports {
+  id uuid [pk, not null, note: 'ORM default: uuid4']
+  university_id uuid [not null]
+  award_id uuid [not null]
+  period_start date [not null]
+  period_end date [not null]
+  narrative text [not null]
+  financial_summary text
+  submitter_id int [not null]
+  status varchar(32) [not null, default: 'draft']
+  submitted_at timestamptz
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`, note: 'ORM onupdate: now()']
+  checks {
+    `period_end >= period_start` [name: 'ck_grant_progress_reports_period']
+    `status IN ('draft', 'submitted', 'under_review', 'revision_requested', 'approved', 'rejected')` [name: 'ck_grant_progress_reports_status']
+  }
+}
+
+Table grant_project_allocations {
+  id uuid [pk, not null, note: 'ORM default: uuid4']
+  university_id uuid [not null]
+  award_id uuid [not null]
+  project_id uuid [not null]
+  allocated_amount decimal(14,2) [not null]
+  currency varchar(3) [not null]
+  created_by_id int [not null]
+  created_at timestamptz [not null, default: `now()`]
+  indexes {
+  (award_id, project_id) [unique, name: 'uq_grant_project_allocations_award_project']
+  }
+  checks {
+    `allocated_amount >= 0` [name: 'ck_grant_project_allocations_amount']
+  }
+}
+
+Table milestone_templates {
+  id uuid [pk, not null, note: 'ORM default: uuid4']
+  university_id uuid [not null]
+  department_id int
+  name varchar(255) [not null]
+  description text
+  default_duration_days int [not null]
+  is_active boolean [not null, default: true]
+  created_by_id int [not null]
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`, note: 'ORM onupdate: now()']
+  indexes {
+  (id, university_id) [unique, name: 'uq_milestone_templates_id_university']
+  }
+  checks {
+    `default_duration_days > 0` [name: 'ck_milestone_templates_duration']
+  }
+}
+
+Table notification_preferences {
+  id uuid [pk, not null, note: 'ORM default: uuid4']
+  user_id int [not null]
+  university_id uuid [not null]
+  notification_type varchar(64) [not null]
+  channel varchar(32) [not null, default: 'in_app']
+  is_enabled boolean [not null, default: true]
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`, note: 'ORM onupdate: now()']
+  indexes {
+  (user_id, university_id, notification_type, channel) [unique, name: 'uq_notification_preferences_user_university_type_channel']
+  }
+  checks {
+    `channel = 'in_app'` [name: 'ck_notification_preferences_channel']
+    `length(btrim(notification_type)) > 0` [name: 'ck_notification_preferences_type_nonempty']
+  }
+}
+
+Table notifications {
+  id uuid [pk, not null, note: 'ORM default: uuid4']
+  university_id uuid [not null]
+  recipient_id int [not null]
+  notification_type varchar(64) [not null]
+  title varchar(255) [not null]
+  message text [not null]
+  entity_type varchar(128)
+  entity_id uuid
+  created_at timestamptz [not null, default: `now()`]
+  read_at timestamptz
+  dismissed_at timestamptz
+  indexes {
+  (recipient_id, created_at) [name: 'ix_notifications_recipient_created']
+  (recipient_id, read_at, created_at) [name: 'ix_notifications_recipient_unread_created']
+  }
+}
+
+Table permissions {
+  id uuid [pk, not null, note: 'ORM default: uuid4']
+  code varchar(128) [not null]
+  description text
+  is_active boolean [not null, default: true]
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`, note: 'ORM onupdate: now()']
+  indexes {
+  (code) [unique]
+  }
+}
+
+Table progress_report_reviews {
+  id uuid [pk, not null, note: 'ORM default: uuid4']
+  university_id uuid [not null]
+  report_id uuid [not null]
+  reviewer_id int [not null]
+  decision varchar(32) [not null]
+  feedback text
+  reviewed_at timestamptz [not null, default: `now()`]
+  checks {
+    `decision IN ('approved', 'rejected', 'revision_requested', 'commented')` [name: 'ck_progress_report_reviews_decision']
+  }
+}
+
+Table progress_reports {
+  id uuid [pk, not null, note: 'ORM default: uuid4']
+  university_id uuid [not null]
+  project_id uuid [not null]
+  milestone_id uuid
+  submitter_id int [not null]
+  period_start date [not null]
+  period_end date [not null]
+  title varchar(255) [not null]
+  content text [not null]
+  challenges text
+  next_steps text
+  status varchar(32) [not null, default: 'draft']
+  submitted_at timestamptz
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`, note: 'ORM onupdate: now()']
+  indexes {
+  (id, university_id) [unique, name: 'uq_progress_reports_id_university']
+  (project_id, period_start, period_end) [name: 'ix_progress_reports_project_period']
+  }
+  checks {
+    `period_end >= period_start` [name: 'ck_progress_reports_period']
+    `status IN ('draft', 'submitted', 'under_review', 'revision_requested', 'approved', 'rejected')` [name: 'ck_progress_reports_status']
+  }
+}
+
+Table project_comments {
+  id uuid [pk, not null, note: 'ORM default: uuid4']
+  university_id uuid [not null]
+  project_id uuid
+  milestone_id uuid
+  progress_report_id uuid
+  author_id int [not null]
+  body text [not null]
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [note: 'ORM onupdate: now()']
+  indexes {
+  (project_id, created_at) [name: 'ix_project_comments_project_created']
+  }
+  checks {
+    `num_nonnulls(project_id, milestone_id, progress_report_id) = 1` [name: 'ck_project_comments_one_target']
+  }
+}
+
+Table project_milestones {
+  id uuid [pk, not null, note: 'ORM default: uuid4']
+  university_id uuid [not null]
+  project_id uuid [not null]
+  template_id uuid
+  title varchar(255) [not null]
+  description text
+  sequence_number int [not null]
+  due_date date [not null]
+  status varchar(32) [not null, default: 'pending']
+  completed_at timestamptz
+  created_by_id int [not null]
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`, note: 'ORM onupdate: now()']
+  indexes {
+  (project_id, sequence_number) [unique, name: 'uq_project_milestones_sequence']
+  (id, university_id) [unique, name: 'uq_project_milestones_id_university']
+  (id, project_id, university_id) [unique, name: 'uq_project_milestones_id_project_university']
+  }
+  checks {
+    `completed_at IS NULL OR status = 'completed'` [name: 'ck_project_milestones_completed']
+    `sequence_number > 0` [name: 'ck_project_milestones_sequence']
+    `status IN ('pending', 'in_progress', 'submitted', 'approved', 'revision_requested', 'overdue', 'completed', 'cancelled')` [name: 'ck_project_milestones_status']
+  }
+}
+
+Table project_participants {
+  id uuid [pk, not null, note: 'ORM default: uuid4']
+  university_id uuid [not null]
+  project_id uuid [not null]
+  student_id int [not null]
+  participation_role varchar(64) [not null]
+  is_lead boolean [not null, default: false]
+  started_at timestamptz [not null, default: `now()`]
+  ended_at timestamptz
+  created_at timestamptz [not null, default: `now()`]
+  // PostgreSQL partial-index predicate for uq_project_participants_active_lead: is_lead = true AND ended_at IS NULL
+  // PostgreSQL partial-index predicate for uq_project_participants_active_student: ended_at IS NULL
+  indexes {
+  (project_id) [unique, name: 'uq_project_participants_active_lead']
+  (project_id, student_id) [unique, name: 'uq_project_participants_active_student']
+  }
+  checks {
+    `ended_at IS NULL OR ended_at >= started_at` [name: 'ck_project_participants_dates']
+  }
+}
+
+Table project_status_history {
+  id uuid [pk, not null, note: 'ORM default: uuid4']
+  university_id uuid [not null]
+  project_id uuid [not null]
+  previous_status varchar(32)
+  new_status varchar(32) [not null]
+  actor_id int [not null]
+  reason text
+  created_at timestamptz [not null, default: `now()`]
+}
+
+Table project_supervisors {
+  id uuid [pk, not null, note: 'ORM default: uuid4']
+  university_id uuid [not null]
+  project_id uuid [not null]
+  staff_id int [not null]
+  assigned_by_id int [not null]
+  assignment_role varchar(32) [not null]
+  started_at timestamptz [not null, default: `now()`]
+  ended_at timestamptz
+  created_at timestamptz [not null, default: `now()`]
+  // PostgreSQL partial-index predicate for uq_project_supervisors_active_staff: ended_at IS NULL
+  // PostgreSQL partial-index predicate for uq_project_supervisors_primary_active: assignment_role = 'primary' AND ended_at IS NULL
+  indexes {
+  (project_id, staff_id) [unique, name: 'uq_project_supervisors_active_staff']
+  (project_id) [unique, name: 'uq_project_supervisors_primary_active']
+  }
+  checks {
+    `ended_at IS NULL OR ended_at >= started_at` [name: 'ck_project_supervisors_dates']
+    `assignment_role IN ('primary', 'co_supervisor')` [name: 'ck_project_supervisors_role']
+  }
+}
+
+Table proposal_participants {
+  id uuid [pk, not null, note: 'ORM default: uuid4']
+  university_id uuid [not null]
+  proposal_id uuid [not null]
+  student_id int [not null]
+  participation_role varchar(64) [not null]
+  is_lead boolean [not null, default: false]
+  // PostgreSQL partial-index predicate for uq_proposal_participants_lead: is_lead = true
+  indexes {
+  (proposal_id, student_id) [unique, name: 'uq_proposal_participants_proposal_student']
+  (proposal_id) [unique, name: 'uq_proposal_participants_lead']
+  }
+}
+
+Table proposal_reviews {
+  id uuid [pk, not null, note: 'ORM default: uuid4']
+  university_id uuid [not null]
+  proposal_id uuid [not null]
+  reviewer_id int [not null]
+  decision varchar(32) [not null]
+  comments text
+  reviewed_at timestamptz [not null, default: `now()`]
+  indexes {
+  (proposal_id, reviewed_at) [name: 'ix_proposal_reviews_proposal_reviewed_at']
+  }
+  checks {
+    `decision IN ('approved', 'rejected', 'revision_requested', 'commented')` [name: 'ck_proposal_reviews_decision']
+  }
+}
+
+Table proposal_revisions {
+  id uuid [pk, not null, note: 'ORM default: uuid4']
+  university_id uuid [not null]
+  proposal_id uuid [not null]
+  revision_number int [not null]
+  title varchar(500) [not null]
+  abstract text
+  research_problem text
+  objectives text
+  methodology text
+  expected_outcomes text
+  submitted_by_id int [not null]
+  submitted_at timestamptz [not null, default: `now()`]
+  indexes {
+  (proposal_id, revision_number) [unique, name: 'uq_proposal_revisions_number']
+  }
+  checks {
+    `revision_number > 0` [name: 'ck_proposal_revisions_number']
+  }
+}
+
+Table proposal_status_history {
+  id uuid [pk, not null, note: 'ORM default: uuid4']
+  university_id uuid [not null]
+  proposal_id uuid [not null]
+  previous_status varchar(32)
+  new_status varchar(32) [not null]
+  actor_id int [not null]
+  reason text
+  created_at timestamptz [not null, default: `now()`]
+}
+
+Table proposal_supervisors {
+  id uuid [pk, not null, note: 'ORM default: uuid4']
+  university_id uuid [not null]
+  proposal_id uuid [not null]
+  staff_id int [not null]
+  assigned_by_id int [not null]
+  assignment_role varchar(32) [not null]
+  assigned_at timestamptz [not null, default: `now()`]
+  ended_at timestamptz
+  // PostgreSQL partial-index predicate for uq_proposal_supervisors_active: ended_at IS NULL
+  // PostgreSQL partial-index predicate for uq_proposal_supervisors_primary_active: assignment_role = 'primary' AND ended_at IS NULL
+  indexes {
+  (proposal_id, staff_id) [unique, name: 'uq_proposal_supervisors_active']
+  (proposal_id) [unique, name: 'uq_proposal_supervisors_primary_active']
+  }
+  checks {
+    `ended_at IS NULL OR ended_at >= assigned_at` [name: 'ck_proposal_supervisors_dates']
+    `assignment_role IN ('primary', 'co_supervisor')` [name: 'ck_proposal_supervisors_role']
+  }
+}
+
+Table publication_authors {
+  id uuid [pk, not null, note: 'ORM default: uuid4']
+  university_id uuid [not null]
+  publication_id uuid [not null]
+  internal_user_id int
+  external_author_name varchar(255)
+  external_affiliation varchar(255)
+  author_order int [not null]
+  is_corresponding boolean [not null, default: false]
+  created_at timestamptz [not null, default: `now()`]
+  // PostgreSQL partial-index predicate for uq_publication_authors_corresponding: is_corresponding = true
+  indexes {
+  (publication_id, author_order) [unique, name: 'uq_publication_authors_order']
+  (publication_id) [unique, name: 'uq_publication_authors_corresponding']
+  }
+  checks {
+    `(internal_user_id IS NOT NULL AND external_author_name IS NULL) OR (internal_user_id IS NULL AND external_author_name IS NOT NULL)` [name: 'ck_publication_authors_identity']
+    `author_order > 0` [name: 'ck_publication_authors_order_positive']
+  }
+}
+
+Table publication_projects {
+  id uuid [pk, not null, note: 'ORM default: uuid4']
+  university_id uuid [not null]
+  publication_id uuid [not null]
+  project_id uuid [not null]
+  created_at timestamptz [not null, default: `now()`]
+  indexes {
+  (publication_id, project_id) [unique, name: 'uq_publication_projects_publication_project']
+  }
+}
+
+Table publication_reviews {
+  id uuid [pk, not null, note: 'ORM default: uuid4']
+  university_id uuid [not null]
+  publication_id uuid [not null]
+  reviewer_id int [not null]
+  decision varchar(32) [not null]
+  comments text
+  reviewed_at timestamptz [not null, default: `now()`]
+  checks {
+    `decision IN ('verified', 'rejected', 'revision_requested', 'commented')` [name: 'ck_publication_reviews_decision']
+  }
+}
+
+Table publications {
+  id uuid [pk, not null, note: 'ORM default: uuid4']
+  university_id uuid [not null]
+  title varchar(500) [not null]
+  abstract text
+  publication_type varchar(64) [not null]
+  doi varchar(255)
+  normalized_doi varchar(255)
+  journal varchar(255)
+  publisher varchar(255)
+  publication_date date
+  volume varchar(64)
+  issue varchar(64)
+  page_range varchar(64)
+  url varchar(2048)
+  verification_status varchar(32) [not null, default: 'draft']
+  submitter_id int [not null]
+  verifier_id int
+  verified_at timestamptz
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`, note: 'ORM onupdate: now()']
+  // PostgreSQL partial-index predicate for uq_publications_normalized_doi: normalized_doi IS NOT NULL
+  indexes {
+  (id, university_id) [unique, name: 'uq_publications_id_university']
+  (verification_status, publication_date) [name: 'ix_publications_status_date']
+  (normalized_doi) [unique, name: 'uq_publications_normalized_doi']
+  }
+  checks {
+    `verification_status IN ('draft', 'submitted', 'under_verification', 'verified', 'rejected', 'withdrawn')` [name: 'ck_publications_status']
+  }
+}
+
+Table research_projects {
+  id uuid [pk, not null, note: 'ORM default: uuid4']
+  university_id uuid [not null]
+  proposal_id uuid [not null]
+  department_id int [not null]
+  title varchar(500) [not null]
+  abstract text
+  start_date date [not null]
+  expected_end_date date
+  actual_end_date date
+  status varchar(32) [not null, default: 'active']
+  created_by_id int [not null]
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`, note: 'ORM onupdate: now()']
+  indexes {
+  (id, university_id) [unique, name: 'uq_research_projects_id_university']
+  (proposal_id) [unique]
+  (department_id, status) [name: 'ix_research_projects_department_status']
+  }
+  checks {
+    `actual_end_date IS NULL OR actual_end_date >= start_date` [name: 'ck_research_projects_actual_end']
+    `expected_end_date IS NULL OR expected_end_date >= start_date` [name: 'ck_research_projects_dates']
+    `status IN ('active', 'on_hold', 'completed', 'cancelled', 'archived')` [name: 'ck_research_projects_status']
+  }
+}
+
+Table research_proposals {
+  id uuid [pk, not null, note: 'ORM default: uuid4']
+  university_id uuid [not null]
+  topic_id uuid [not null]
+  submitting_user_id int [not null]
+  department_id int [not null]
+  title varchar(500) [not null]
+  abstract text
+  research_problem text
+  objectives text
+  methodology text
+  expected_outcomes text
+  status varchar(32) [not null, default: 'draft']
+  submitted_at timestamptz
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`, note: 'ORM onupdate: now()']
+  indexes {
+  (id, university_id) [unique, name: 'uq_research_proposals_id_university']
+  (department_id, status) [name: 'ix_research_proposals_department_status']
+  }
+  checks {
+    `status IN ('draft', 'submitted', 'under_review', 'revision_requested', 'approved', 'rejected', 'withdrawn')` [name: 'ck_research_proposals_status']
+    `submitted_at IS NULL OR status <> 'draft'` [name: 'ck_research_proposals_submission']
+  }
+}
+
+Table research_topics {
+  id uuid [pk, not null, note: 'ORM default: uuid4']
+  university_id uuid [not null]
+  title varchar(500) [not null]
+  normalized_title varchar(500) [not null]
+  abstract text
+  keywords text
+  department_id int [not null]
+  created_by_id int [not null]
+  is_active boolean [not null, default: true]
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`, note: 'ORM onupdate: now()']
+  indexes {
+  (id, university_id) [unique, name: 'uq_research_topics_id_university']
+  (department_id, is_active) [name: 'ix_research_topics_department_status']
+  (normalized_title) [name: 'ix_research_topics_normalized_title']
+  }
+}
+
+Table retention_policies {
+  id uuid [pk, not null, note: 'ORM default: uuid4']
+  university_id uuid [not null]
+  record_category varchar(128) [not null]
+  retention_days int [not null]
+  post_retention_action varchar(32) [not null, default: 'review']
+  department_id int
+  is_enabled boolean [not null, default: true]
+  created_by_id int [not null]
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`, note: 'ORM onupdate: now()']
+  // PostgreSQL partial-index predicate for uq_retention_policies_university_category_department: department_id IS NOT NULL
+  // PostgreSQL partial-index predicate for uq_retention_policies_university_category_global: department_id IS NULL
+  indexes {
+  (university_id, record_category, department_id) [unique, name: 'uq_retention_policies_university_category_department']
+  (university_id, record_category) [unique, name: 'uq_retention_policies_university_category_global']
+  }
+  checks {
+    `post_retention_action IN ('review', 'archive', 'anonymize', 'delete')` [name: 'ck_retention_policies_action']
+    `retention_days > 0` [name: 'ck_retention_policies_days']
+  }
+}
+
+Table role_permissions {
+  id uuid [pk, not null, note: 'ORM default: uuid4']
+  role_id int [not null]
+  permission_id uuid [not null]
+  indexes {
+  (role_id, permission_id) [unique, name: 'uq_role_permissions_role_permission']
+  }
+}
+
+Table roles {
+  id int [pk, not null]
+  code varchar(64) [not null]
+  name varchar(128) [not null]
+  description text
+  is_active boolean [not null, default: true]
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`, note: 'ORM onupdate: now()']
+  indexes {
+  (name) [unique]
+  (code) [unique]
+  }
+}
+
+Table staff_profiles {
+  id int [pk, not null]
+  user_id int [not null]
+  university_id uuid [not null]
+  staff_id varchar(64) [not null]
+  department_id int [not null]
+  job_title varchar(128) [not null]
+  academic_designation varchar(128)
+  gender varchar(32)
+  phone_number varchar(32)
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`, note: 'ORM onupdate: now()']
+  indexes {
+  (university_id, staff_id) [unique, name: 'uq_staff_profiles_university_staff_id']
+  (user_id, university_id) [unique, name: 'uq_staff_profiles_user_university']
+  (id, department_id, university_id) [unique, name: 'uq_staff_profiles_id_department_university']
+  (id, university_id) [unique, name: 'uq_staff_profiles_id_university']
+  }
+  checks {
+    `gender IS NULL OR gender IN ('female', 'male', 'non_binary', 'undisclosed')` [name: 'ck_staff_profiles_gender']
+  }
+}
+
+Table stored_files {
+  id uuid [pk, not null, note: 'ORM default: uuid4']
+  university_id uuid [not null]
+  uploader_id int [not null]
+  storage_key varchar(1024) [not null]
+  original_filename varchar(512) [not null]
+  content_type varchar(255) [not null]
+  file_size_bytes int [not null]
+  checksum varchar(128)
+  created_at timestamptz [not null, default: `now()`]
+  deleted_at timestamptz
+  indexes {
+  (id, university_id) [unique, name: 'uq_stored_files_id_university']
+  (storage_key) [unique]
+  (uploader_id, created_at) [name: 'ix_stored_files_uploader_created']
+  }
+  checks {
+    `file_size_bytes >= 0` [name: 'ck_stored_files_size']
+  }
+}
+
+Table student_activity {
+  id uuid [pk, not null, note: 'ORM default: uuid4']
+  university_id uuid [not null]
+  student_id int [not null]
+  project_id uuid
+  activity_type varchar(64) [not null]
+  activity_metadata jsonb [not null, default: '{}']
+  recorded_at timestamptz [not null, default: `now()`]
+  indexes {
+  (student_id, recorded_at) [name: 'ix_student_activity_student_recorded']
+  }
+}
+
+Table student_profiles {
+  id int [pk, not null]
+  user_id int [not null]
+  university_id uuid [not null]
+  student_id varchar(64) [not null]
+  department_id int [not null]
+  academic_level varchar(64) [not null]
+  gender varchar(32)
+  enrollment_date date
+  academic_account_status varchar(32) [not null, default: 'active']
+  phone_number varchar(32)
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`, note: 'ORM onupdate: now()']
+  indexes {
+  (university_id, student_id) [unique, name: 'uq_student_profiles_university_student_id']
+  (user_id, university_id) [unique, name: 'uq_student_profiles_user_university']
+  (id, university_id) [unique, name: 'uq_student_profiles_id_university']
+  }
+  checks {
+    `academic_account_status IN ('active', 'inactive', 'graduated', 'suspended')` [name: 'ck_student_profiles_account_status']
+    `gender IS NULL OR gender IN ('female', 'male', 'non_binary', 'undisclosed')` [name: 'ck_student_profiles_gender']
+  }
+}
+
+Table system_settings {
+  id uuid [pk, not null, note: 'ORM default: uuid4']
+  university_id uuid [not null]
+  setting_key varchar(128) [not null]
+  setting_value jsonb [not null, default: '{}']
+  updated_by_id int [not null]
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`, note: 'ORM onupdate: now()']
+  indexes {
+  (university_id, setting_key) [unique, name: 'uq_system_settings_university_key']
+  }
+}
+
+Table universities {
+  id uuid [pk, not null, note: 'ORM default: uuid4']
+  name varchar(255) [not null]
+  code varchar(64) [not null]
+  is_active boolean [not null, default: true]
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`, note: 'ORM onupdate: now()']
+  indexes {
+  (code) [unique]
+  }
+}
+
+Table university_memberships {
+  id uuid [pk, not null, note: 'ORM default: uuid4']
+  university_id uuid [not null]
+  user_id int [not null]
+  is_active boolean [not null, default: true]
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`, note: 'ORM onupdate: now()']
+  indexes {
+  (university_id, user_id) [unique, name: 'uq_university_memberships_university_user']
+  (user_id, university_id) [unique, name: 'uq_university_memberships_user_university']
+  }
+}
+
+Table university_settings {
+  id uuid [pk, not null, note: 'ORM default: uuid4']
+  university_id uuid [not null]
+  max_supervisors_per_project int [not null, note: 'ORM default: 2']
+  max_active_projects_per_student int [not null, note: 'ORM default: 1']
+  max_active_supervisees_per_supervisor int [not null, note: 'ORM default: 10']
+  student_inactivity_days int [not null, note: 'ORM default: 30']
+  milestone_reminder_days int [not null, note: 'ORM default: 7']
+  default_proposal_review_days int [not null, note: 'ORM default: 14']
+  updated_by_id int
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`, note: 'ORM onupdate: now()']
+  indexes {
+  (university_id) [unique]
+  }
+  checks {
+    `student_inactivity_days > 0` [name: 'ck_university_settings_inactivity']
+    `max_active_projects_per_student > 0` [name: 'ck_university_settings_projects']
+    `milestone_reminder_days >= 0` [name: 'ck_university_settings_reminder']
+    `default_proposal_review_days > 0` [name: 'ck_university_settings_review']
+    `max_active_supervisees_per_supervisor > 0` [name: 'ck_university_settings_supervisees']
+    `max_supervisors_per_project > 0` [name: 'ck_university_settings_supervisors']
+  }
+}
+
+Table user_roles {
+  id int [pk, not null]
+  university_id uuid [not null]
+  user_id int [not null]
+  role_id int [not null]
+  assigned_at timestamptz [not null, default: `now()`]
+  assigned_by_id int
+  revoked_at timestamptz
+  // PostgreSQL partial-index predicate for uq_user_roles_active_assignment: revoked_at IS NULL
+  indexes {
+  (role_id) [name: 'ix_user_roles_role_id']
+  (university_id, user_id, role_id) [unique, name: 'uq_user_roles_active_assignment']
+  }
+  checks {
+    `revoked_at IS NULL OR revoked_at >= assigned_at` [name: 'ck_user_roles_revoked_at']
+  }
+}
+
+Table users {
+  id int [pk, not null]
+  full_name varchar(255) [not null]
+  email varchar(320) [not null]
+  password_hash varchar(255) [not null]
+  status varchar(32) [not null, default: 'active']
+  email_verified boolean [not null, default: false]
+  email_verified_at timestamptz
+  last_login_at timestamptz
+  created_at timestamptz [not null, default: `now()`]
+  updated_at timestamptz [not null, default: `now()`, note: 'ORM onupdate: now()']
+  indexes {
+  (lower(email)) [unique, name: 'uq_users_email_lower']
+  }
+  checks {
+    `status IN ('active', 'inactive', 'suspended')` [name: 'account_status']
+  }
+}
+
+Ref: account_verifications.user_id > users.id [delete: restrict]
+Ref: alert_events.university_id > universities.id [delete: restrict]
+Ref fk_alert_events_rule_university: alert_events.(rule_id, university_id) > alert_rules.(id, university_id) [delete: restrict]
+Ref: alert_rules.created_by_id > users.id [delete: restrict]
+Ref: alert_rules.university_id > universities.id [delete: restrict]
+Ref fk_alert_rules_created_by_membership: alert_rules.(created_by_id, university_id) > university_memberships.(user_id, university_id) [delete: restrict]
+Ref fk_alert_rules_department_university: alert_rules.(department_id, university_id) > departments.(id, university_id) [delete: restrict]
+Ref: approval_actions.acting_user_id > users.id [delete: restrict]
+Ref: approval_actions.university_id > universities.id [delete: restrict]
+Ref fk_approval_actions_actor_membership: approval_actions.(acting_user_id, university_id) > university_memberships.(user_id, university_id) [delete: restrict]
+Ref fk_approval_actions_instance_version_workflow_university: approval_actions.(instance_id, workflow_version_id, workflow_id, university_id) > approval_instances.(id, workflow_version_id, workflow_id, university_id) [delete: restrict]
+Ref fk_approval_actions_step_version_workflow_university: approval_actions.(step_id, workflow_version_id, workflow_id, university_id) > approval_workflow_steps.(id, workflow_version_id, workflow_id, university_id) [delete: restrict]
+Ref: approval_instances.initiated_by_id > users.id [delete: restrict]
+Ref: approval_instances.university_id > universities.id [delete: restrict]
+Ref fk_approval_instances_initiator_membership: approval_instances.(initiated_by_id, university_id) > university_memberships.(user_id, university_id) [delete: restrict]
+Ref fk_approval_instances_version_workflow_university: approval_instances.(workflow_version_id, workflow_id, university_id) > approval_workflow_versions.(id, workflow_id, university_id) [delete: restrict]
+Ref: approval_workflow_steps.required_role_id > roles.id [delete: restrict]
+Ref: approval_workflow_steps.university_id > universities.id [delete: restrict]
+Ref fk_approval_workflow_steps_version_workflow_university: approval_workflow_steps.(workflow_version_id, workflow_id, university_id) > approval_workflow_versions.(id, workflow_id, university_id) [delete: restrict]
+Ref: approval_workflow_versions.university_id > universities.id [delete: restrict]
+Ref fk_approval_workflow_versions_workflow_university: approval_workflow_versions.(workflow_id, university_id) > approval_workflows.(id, university_id) [delete: restrict]
+Ref: approval_workflows.created_by_id > users.id [delete: restrict]
+Ref: approval_workflows.university_id > universities.id [delete: restrict]
+Ref fk_approval_workflows_active_version: approval_workflows.(active_version_id, id, university_id) > approval_workflow_versions.(id, workflow_id, university_id) [delete: restrict]
+Ref fk_approval_workflows_created_by_membership: approval_workflows.(created_by_id, university_id) > university_memberships.(user_id, university_id) [delete: restrict]
+Ref fk_approval_workflows_department_university: approval_workflows.(department_id, university_id) > departments.(id, university_id) [delete: restrict]
+Ref: audit_logs.acting_user_id > users.id [delete: restrict]
+Ref: audit_logs.university_id > universities.id [delete: restrict]
+Ref fk_audit_logs_actor_membership: audit_logs.(acting_user_id, university_id) > university_memberships.(user_id, university_id) [delete: restrict]
+Ref: department_leadership.appointed_by_id > users.id [delete: restrict]
+Ref: department_leadership.university_id > universities.id [delete: restrict]
+Ref fk_department_leadership_appointed_by_membership: department_leadership.(appointed_by_id, university_id) > university_memberships.(user_id, university_id) [delete: restrict]
+Ref fk_department_leadership_department_university: department_leadership.(department_id, university_id) > departments.(id, university_id) [delete: restrict]
+Ref fk_department_leadership_staff_department_university: department_leadership.(staff_id, department_id, university_id) > staff_profiles.(id, department_id, university_id) [delete: restrict]
+Ref: department_settings.university_id > universities.id [delete: restrict]
+Ref: department_settings.updated_by_id > users.id [delete: restrict]
+Ref fk_department_settings_department_university: department_settings.(department_id, university_id) > departments.(id, university_id) [delete: restrict]
+Ref fk_department_settings_updated_by_membership: department_settings.(updated_by_id, university_id) > university_memberships.(user_id, university_id) [delete: restrict]
+Ref: departments.university_id > universities.id [delete: restrict]
+Ref fk_departments_faculty_university: departments.(faculty_id, university_id) > faculties.(id, university_id) [delete: restrict]
+Ref: document_attachments.university_id > universities.id [delete: restrict]
+Ref: document_attachments.uploader_id > users.id [delete: restrict]
+Ref fk_document_attachments_application_university: document_attachments.(grant_application_id, university_id) > grant_applications.(id, university_id) [delete: restrict]
+Ref fk_document_attachments_file_university: document_attachments.(stored_file_id, university_id) > stored_files.(id, university_id) [delete: restrict]
+Ref fk_document_attachments_project_university: document_attachments.(project_id, university_id) > research_projects.(id, university_id) [delete: restrict]
+Ref fk_document_attachments_proposal_university: document_attachments.(proposal_id, university_id) > research_proposals.(id, university_id) [delete: restrict]
+Ref fk_document_attachments_report_university: document_attachments.(progress_report_id, university_id) > progress_reports.(id, university_id) [delete: restrict]
+Ref fk_document_attachments_uploader_membership: document_attachments.(uploader_id, university_id) > university_memberships.(user_id, university_id) [delete: restrict]
+Ref: duplicate_topic_candidates.reviewed_by_id > users.id [delete: restrict]
+Ref: duplicate_topic_candidates.university_id > universities.id [delete: restrict]
+Ref fk_duplicate_candidates_alert_university: duplicate_topic_candidates.(alert_event_id, university_id) > alert_events.(id, university_id) [delete: restrict]
+Ref fk_duplicate_candidates_reviewer_membership: duplicate_topic_candidates.(reviewed_by_id, university_id) > university_memberships.(user_id, university_id) [delete: restrict]
+Ref fk_duplicate_candidates_topic_a_university: duplicate_topic_candidates.(topic_a_id, university_id) > research_topics.(id, university_id) [delete: restrict]
+Ref fk_duplicate_candidates_topic_b_university: duplicate_topic_candidates.(topic_b_id, university_id) > research_topics.(id, university_id) [delete: restrict]
+Ref: faculties.university_id > universities.id [delete: restrict]
+Ref: grant_application_participants.university_id > universities.id [delete: restrict]
+Ref: grant_application_participants.user_id > users.id [delete: restrict]
+Ref fk_grant_application_participants_application_university: grant_application_participants.(application_id, university_id) > grant_applications.(id, university_id) [delete: restrict]
+Ref fk_grant_application_participants_user_membership: grant_application_participants.(user_id, university_id) > university_memberships.(user_id, university_id) [delete: restrict]
+Ref: grant_application_reviews.reviewer_id > users.id [delete: restrict]
+Ref: grant_application_reviews.university_id > universities.id [delete: restrict]
+Ref fk_grant_application_reviews_application_university: grant_application_reviews.(application_id, university_id) > grant_applications.(id, university_id) [delete: restrict]
+Ref fk_grant_application_reviews_reviewer_membership: grant_application_reviews.(reviewer_id, university_id) > university_memberships.(user_id, university_id) [delete: restrict]
+Ref: grant_application_status_history.actor_id > users.id [delete: restrict]
+Ref: grant_application_status_history.university_id > universities.id [delete: restrict]
+Ref fk_grant_application_history_actor_membership: grant_application_status_history.(actor_id, university_id) > university_memberships.(user_id, university_id) [delete: restrict]
+Ref fk_grant_application_history_application_university: grant_application_status_history.(application_id, university_id) > grant_applications.(id, university_id) [delete: restrict]
+Ref: grant_applications.applicant_id > users.id [delete: restrict]
+Ref: grant_applications.university_id > universities.id [delete: restrict]
+Ref fk_grant_applications_applicant_membership: grant_applications.(applicant_id, university_id) > university_memberships.(user_id, university_id) [delete: restrict]
+Ref fk_grant_applications_opportunity_university: grant_applications.(opportunity_id, university_id) > grant_opportunities.(id, university_id) [delete: restrict]
+Ref fk_grant_applications_project_university: grant_applications.(project_id, university_id) > research_projects.(id, university_id) [delete: restrict]
+Ref: grant_awards.approved_by_id > users.id [delete: restrict]
+Ref: grant_awards.university_id > universities.id [delete: restrict]
+Ref fk_grant_awards_application_university: grant_awards.(application_id, university_id) > grant_applications.(id, university_id) [delete: restrict]
+Ref fk_grant_awards_approved_by_membership: grant_awards.(approved_by_id, university_id) > university_memberships.(user_id, university_id) [delete: restrict]
+Ref: grant_expenditures.recorded_by_id > users.id [delete: restrict]
+Ref: grant_expenditures.university_id > universities.id [delete: restrict]
+Ref fk_grant_expenditures_award_university: grant_expenditures.(award_id, university_id) > grant_awards.(id, university_id) [delete: restrict]
+Ref fk_grant_expenditures_project_university: grant_expenditures.(project_id, university_id) > research_projects.(id, university_id) [delete: restrict]
+Ref fk_grant_expenditures_recorded_by_membership: grant_expenditures.(recorded_by_id, university_id) > university_memberships.(user_id, university_id) [delete: restrict]
+Ref: grant_opportunities.created_by_id > users.id [delete: restrict]
+Ref: grant_opportunities.university_id > universities.id [delete: restrict]
+Ref fk_grant_opportunities_created_by_membership: grant_opportunities.(created_by_id, university_id) > university_memberships.(user_id, university_id) [delete: restrict]
+Ref: grant_progress_reports.submitter_id > users.id [delete: restrict]
+Ref: grant_progress_reports.university_id > universities.id [delete: restrict]
+Ref fk_grant_reports_award_university: grant_progress_reports.(award_id, university_id) > grant_awards.(id, university_id) [delete: restrict]
+Ref fk_grant_reports_submitter_membership: grant_progress_reports.(submitter_id, university_id) > university_memberships.(user_id, university_id) [delete: restrict]
+Ref: grant_project_allocations.created_by_id > users.id [delete: restrict]
+Ref: grant_project_allocations.university_id > universities.id [delete: restrict]
+Ref fk_grant_allocations_award_university: grant_project_allocations.(award_id, university_id) > grant_awards.(id, university_id) [delete: restrict]
+Ref fk_grant_allocations_created_by_membership: grant_project_allocations.(created_by_id, university_id) > university_memberships.(user_id, university_id) [delete: restrict]
+Ref fk_grant_allocations_project_university: grant_project_allocations.(project_id, university_id) > research_projects.(id, university_id) [delete: restrict]
+Ref: milestone_templates.created_by_id > users.id [delete: restrict]
+Ref: milestone_templates.university_id > universities.id [delete: restrict]
+Ref fk_milestone_templates_created_by_membership: milestone_templates.(created_by_id, university_id) > university_memberships.(user_id, university_id) [delete: restrict]
+Ref fk_milestone_templates_department_university: milestone_templates.(department_id, university_id) > departments.(id, university_id) [delete: restrict]
+Ref: notification_preferences.university_id > universities.id [delete: restrict]
+Ref: notification_preferences.user_id > users.id [delete: restrict]
+Ref fk_notification_preferences_membership: notification_preferences.(user_id, university_id) > university_memberships.(user_id, university_id) [delete: restrict]
+Ref: notifications.recipient_id > users.id [delete: restrict]
+Ref: notifications.university_id > universities.id [delete: restrict]
+Ref fk_notifications_recipient_membership: notifications.(recipient_id, university_id) > university_memberships.(user_id, university_id) [delete: restrict]
+Ref: progress_report_reviews.reviewer_id > users.id [delete: restrict]
+Ref: progress_report_reviews.university_id > universities.id [delete: restrict]
+Ref fk_progress_report_reviews_report_university: progress_report_reviews.(report_id, university_id) > progress_reports.(id, university_id) [delete: restrict]
+Ref fk_progress_report_reviews_reviewer_membership: progress_report_reviews.(reviewer_id, university_id) > university_memberships.(user_id, university_id) [delete: restrict]
+Ref: progress_reports.submitter_id > users.id [delete: restrict]
+Ref: progress_reports.university_id > universities.id [delete: restrict]
+Ref fk_progress_reports_milestone_project_university: progress_reports.(milestone_id, project_id, university_id) > project_milestones.(id, project_id, university_id) [delete: restrict]
+Ref fk_progress_reports_project_university: progress_reports.(project_id, university_id) > research_projects.(id, university_id) [delete: restrict]
+Ref fk_progress_reports_submitter_membership: progress_reports.(submitter_id, university_id) > university_memberships.(user_id, university_id) [delete: restrict]
+Ref: project_comments.author_id > users.id [delete: restrict]
+Ref: project_comments.university_id > universities.id [delete: restrict]
+Ref fk_project_comments_author_membership: project_comments.(author_id, university_id) > university_memberships.(user_id, university_id) [delete: restrict]
+Ref fk_project_comments_milestone_university: project_comments.(milestone_id, university_id) > project_milestones.(id, university_id) [delete: restrict]
+Ref fk_project_comments_project_university: project_comments.(project_id, university_id) > research_projects.(id, university_id) [delete: restrict]
+Ref fk_project_comments_report_university: project_comments.(progress_report_id, university_id) > progress_reports.(id, university_id) [delete: restrict]
+Ref: project_milestones.created_by_id > users.id [delete: restrict]
+Ref: project_milestones.university_id > universities.id [delete: restrict]
+Ref fk_project_milestones_created_by_membership: project_milestones.(created_by_id, university_id) > university_memberships.(user_id, university_id) [delete: restrict]
+Ref fk_project_milestones_project_university: project_milestones.(project_id, university_id) > research_projects.(id, university_id) [delete: restrict]
+Ref fk_project_milestones_template_university: project_milestones.(template_id, university_id) > milestone_templates.(id, university_id) [delete: restrict]
+Ref: project_participants.university_id > universities.id [delete: restrict]
+Ref fk_project_participants_project_university: project_participants.(project_id, university_id) > research_projects.(id, university_id) [delete: restrict]
+Ref fk_project_participants_student_university: project_participants.(student_id, university_id) > student_profiles.(id, university_id) [delete: restrict]
+Ref: project_status_history.actor_id > users.id [delete: restrict]
+Ref: project_status_history.university_id > universities.id [delete: restrict]
+Ref fk_project_history_actor_membership: project_status_history.(actor_id, university_id) > university_memberships.(user_id, university_id) [delete: restrict]
+Ref fk_project_history_project_university: project_status_history.(project_id, university_id) > research_projects.(id, university_id) [delete: restrict]
+Ref: project_supervisors.assigned_by_id > users.id [delete: restrict]
+Ref: project_supervisors.university_id > universities.id [delete: restrict]
+Ref fk_project_supervisors_assigned_by_membership: project_supervisors.(assigned_by_id, university_id) > university_memberships.(user_id, university_id) [delete: restrict]
+Ref fk_project_supervisors_project_university: project_supervisors.(project_id, university_id) > research_projects.(id, university_id) [delete: restrict]
+Ref fk_project_supervisors_staff_university: project_supervisors.(staff_id, university_id) > staff_profiles.(id, university_id) [delete: restrict]
+Ref: proposal_participants.university_id > universities.id [delete: restrict]
+Ref fk_proposal_participants_proposal_university: proposal_participants.(proposal_id, university_id) > research_proposals.(id, university_id) [delete: restrict]
+Ref fk_proposal_participants_student_university: proposal_participants.(student_id, university_id) > student_profiles.(id, university_id) [delete: restrict]
+Ref: proposal_reviews.reviewer_id > users.id [delete: restrict]
+Ref: proposal_reviews.university_id > universities.id [delete: restrict]
+Ref fk_proposal_reviews_proposal_university: proposal_reviews.(proposal_id, university_id) > research_proposals.(id, university_id) [delete: restrict]
+Ref fk_proposal_reviews_reviewer_membership: proposal_reviews.(reviewer_id, university_id) > university_memberships.(user_id, university_id) [delete: restrict]
+Ref: proposal_revisions.submitted_by_id > users.id [delete: restrict]
+Ref: proposal_revisions.university_id > universities.id [delete: restrict]
+Ref fk_proposal_revisions_proposal_university: proposal_revisions.(proposal_id, university_id) > research_proposals.(id, university_id) [delete: restrict]
+Ref fk_proposal_revisions_submitter_membership: proposal_revisions.(submitted_by_id, university_id) > university_memberships.(user_id, university_id) [delete: restrict]
+Ref: proposal_status_history.actor_id > users.id [delete: restrict]
+Ref: proposal_status_history.university_id > universities.id [delete: restrict]
+Ref fk_proposal_history_actor_membership: proposal_status_history.(actor_id, university_id) > university_memberships.(user_id, university_id) [delete: restrict]
+Ref fk_proposal_history_proposal_university: proposal_status_history.(proposal_id, university_id) > research_proposals.(id, university_id) [delete: restrict]
+Ref: proposal_supervisors.assigned_by_id > users.id [delete: restrict]
+Ref: proposal_supervisors.university_id > universities.id [delete: restrict]
+Ref fk_proposal_supervisors_assigned_by_membership: proposal_supervisors.(assigned_by_id, university_id) > university_memberships.(user_id, university_id) [delete: restrict]
+Ref fk_proposal_supervisors_proposal_university: proposal_supervisors.(proposal_id, university_id) > research_proposals.(id, university_id) [delete: restrict]
+Ref fk_proposal_supervisors_staff_university: proposal_supervisors.(staff_id, university_id) > staff_profiles.(id, university_id) [delete: restrict]
+Ref: publication_authors.internal_user_id > users.id [delete: restrict]
+Ref: publication_authors.university_id > universities.id [delete: restrict]
+Ref fk_publication_authors_internal_user_membership: publication_authors.(internal_user_id, university_id) > university_memberships.(user_id, university_id) [delete: restrict]
+Ref fk_publication_authors_publication_university: publication_authors.(publication_id, university_id) > publications.(id, university_id) [delete: restrict]
+Ref: publication_projects.university_id > universities.id [delete: restrict]
+Ref fk_publication_projects_project_university: publication_projects.(project_id, university_id) > research_projects.(id, university_id) [delete: restrict]
+Ref fk_publication_projects_publication_university: publication_projects.(publication_id, university_id) > publications.(id, university_id) [delete: restrict]
+Ref: publication_reviews.reviewer_id > users.id [delete: restrict]
+Ref: publication_reviews.university_id > universities.id [delete: restrict]
+Ref fk_publication_reviews_publication_university: publication_reviews.(publication_id, university_id) > publications.(id, university_id) [delete: restrict]
+Ref fk_publication_reviews_reviewer_membership: publication_reviews.(reviewer_id, university_id) > university_memberships.(user_id, university_id) [delete: restrict]
+Ref: publications.submitter_id > users.id [delete: restrict]
+Ref: publications.university_id > universities.id [delete: restrict]
+Ref: publications.verifier_id > users.id [delete: restrict]
+Ref fk_publications_submitter_membership: publications.(submitter_id, university_id) > university_memberships.(user_id, university_id) [delete: restrict]
+Ref fk_publications_verifier_membership: publications.(verifier_id, university_id) > university_memberships.(user_id, university_id) [delete: restrict]
+Ref: research_projects.created_by_id > users.id [delete: restrict]
+Ref: research_projects.university_id > universities.id [delete: restrict]
+Ref fk_research_projects_created_by_membership: research_projects.(created_by_id, university_id) > university_memberships.(user_id, university_id) [delete: restrict]
+Ref fk_research_projects_department_university: research_projects.(department_id, university_id) > departments.(id, university_id) [delete: restrict]
+Ref fk_research_projects_proposal_university: research_projects.(proposal_id, university_id) > research_proposals.(id, university_id) [delete: restrict]
+Ref: research_proposals.submitting_user_id > users.id [delete: restrict]
+Ref: research_proposals.university_id > universities.id [delete: restrict]
+Ref fk_research_proposals_department_university: research_proposals.(department_id, university_id) > departments.(id, university_id) [delete: restrict]
+Ref fk_research_proposals_submitter_membership: research_proposals.(submitting_user_id, university_id) > university_memberships.(user_id, university_id) [delete: restrict]
+Ref fk_research_proposals_topic_university: research_proposals.(topic_id, university_id) > research_topics.(id, university_id) [delete: restrict]
+Ref: research_topics.created_by_id > users.id [delete: restrict]
+Ref: research_topics.university_id > universities.id [delete: restrict]
+Ref fk_research_topics_created_by_membership: research_topics.(created_by_id, university_id) > university_memberships.(user_id, university_id) [delete: restrict]
+Ref fk_research_topics_department_university: research_topics.(department_id, university_id) > departments.(id, university_id) [delete: restrict]
+Ref: retention_policies.created_by_id > users.id [delete: restrict]
+Ref: retention_policies.university_id > universities.id [delete: restrict]
+Ref fk_retention_policies_created_by_membership: retention_policies.(created_by_id, university_id) > university_memberships.(user_id, university_id) [delete: restrict]
+Ref fk_retention_policies_department_university: retention_policies.(department_id, university_id) > departments.(id, university_id) [delete: restrict]
+Ref: role_permissions.permission_id > permissions.id [delete: restrict]
+Ref: role_permissions.role_id > roles.id [delete: restrict]
+Ref: staff_profiles.university_id > universities.id [delete: restrict]
+Ref: staff_profiles.user_id > users.id [delete: restrict]
+Ref fk_staff_profiles_department_university: staff_profiles.(department_id, university_id) > departments.(id, university_id) [delete: restrict]
+Ref fk_staff_profiles_membership: staff_profiles.(user_id, university_id) > university_memberships.(user_id, university_id) [delete: restrict]
+Ref: stored_files.university_id > universities.id [delete: restrict]
+Ref: stored_files.uploader_id > users.id [delete: restrict]
+Ref fk_stored_files_uploader_membership: stored_files.(uploader_id, university_id) > university_memberships.(user_id, university_id) [delete: restrict]
+Ref: student_activity.university_id > universities.id [delete: restrict]
+Ref fk_student_activity_project_university: student_activity.(project_id, university_id) > research_projects.(id, university_id) [delete: restrict]
+Ref fk_student_activity_student_university: student_activity.(student_id, university_id) > student_profiles.(id, university_id) [delete: restrict]
+Ref: student_profiles.university_id > universities.id [delete: restrict]
+Ref: student_profiles.user_id > users.id [delete: restrict]
+Ref fk_student_profiles_department_university: student_profiles.(department_id, university_id) > departments.(id, university_id) [delete: restrict]
+Ref fk_student_profiles_membership: student_profiles.(user_id, university_id) > university_memberships.(user_id, university_id) [delete: restrict]
+Ref: system_settings.university_id > universities.id [delete: restrict]
+Ref: system_settings.updated_by_id > users.id [delete: restrict]
+Ref fk_system_settings_updated_by_membership: system_settings.(updated_by_id, university_id) > university_memberships.(user_id, university_id) [delete: restrict]
+Ref: university_memberships.university_id > universities.id [delete: restrict]
+Ref: university_memberships.user_id > users.id [delete: restrict]
+Ref: university_settings.university_id > universities.id [delete: restrict]
+Ref: university_settings.updated_by_id > users.id [delete: restrict]
+Ref fk_university_settings_updated_by_membership: university_settings.(updated_by_id, university_id) > university_memberships.(user_id, university_id) [delete: restrict]
+Ref: user_roles.assigned_by_id > users.id [delete: restrict]
+Ref: user_roles.role_id > roles.id [delete: restrict]
+Ref: user_roles.university_id > universities.id [delete: restrict]
+Ref: user_roles.user_id > users.id [delete: restrict]
+Ref fk_user_roles_assigned_by_membership: user_roles.(university_id, assigned_by_id) > university_memberships.(university_id, user_id) [delete: restrict]
+Ref fk_user_roles_membership: user_roles.(university_id, user_id) > university_memberships.(university_id, user_id) [delete: restrict]

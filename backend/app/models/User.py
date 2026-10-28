@@ -99,6 +99,10 @@ class User(TimestampMixin, Base):
         back_populates="user",
         passive_deletes=True,
     )
+    notification_preferences: Mapped[list["NotificationPreference"]] = relationship(
+        back_populates="user",
+        passive_deletes=True,
+    )
 
     @validates("email")
     def normalize_email(self, _key: str, value: str) -> str:

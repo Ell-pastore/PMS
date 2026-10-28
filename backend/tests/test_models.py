@@ -28,6 +28,7 @@ def test_complete_model_registry_is_loaded() -> None:
         "approval_workflows",
         "approval_instances",
         "notifications",
+        "notification_preferences",
         "stored_files",
         "audit_logs",
         "retention_policies",
@@ -74,12 +75,38 @@ def test_required_partial_indexes_and_constraints_exist() -> None:
     project_participants = Base.metadata.tables["project_participants"]
     assert any(i.name == "uq_project_participants_active_lead" for i in project_participants.indexes)
 
+    audit_logs = Base.metadata.tables["audit_logs"]
+    assert isinstance(audit_logs.c.entity_uuid.type, Uuid)
+    assert isinstance(audit_logs.c.entity_integer.type, Integer)
+    assert "entity_id" not in audit_logs.c
+    assert any(i.name == "ix_audit_logs_entity_uuid_event" for i in audit_logs.indexes)
+    assert any(i.name == "ix_audit_logs_entity_integer_event" for i in audit_logs.indexes)
+    assert any(c.name == "ck_audit_logs_entity_identifier_type" for c in audit_logs.constraints)
+
+    preferences = Base.metadata.tables["notification_preferences"]
+    assert isinstance(preferences.c.id.type, Uuid)
+    assert isinstance(preferences.c.user_id.type, Integer)
+    assert isinstance(preferences.c.university_id.type, Uuid)
+    assert any(
+        constraint.name == "uq_notification_preferences_user_university_type_channel"
+        for constraint in preferences.constraints
+    )
+    assert any(
+        constraint.name == "ck_notification_preferences_channel"
+        for constraint in preferences.constraints
+    )
+    assert any(
+        constraint.name == "ck_notification_preferences_type_nonempty"
+        for constraint in preferences.constraints
+    )
+
 
 def test_key_relationship_cardinality_and_seed_roles() -> None:
     user_mapper = Base.registry.mappers
     user = next(mapper for mapper in user_mapper if mapper.local_table.name == "users")
     assert user.relationships["student_profiles"].uselist is True
     assert user.relationships["staff_profiles"].uselist is True
+    assert user.relationships["notification_preferences"].uselist is True
 
     grant_application = next(
         mapper for mapper in Base.registry.mappers if mapper.local_table.name == "grant_applications"

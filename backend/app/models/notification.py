@@ -64,3 +64,58 @@ class Notification(Base):
     dismissed_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
 
     recipient: Mapped["User"] = relationship()
+
+
+class NotificationPreference(TimestampMixin, Base):
+    """Per-user, per-university preferences for in-app notifications."""
+
+    __tablename__ = "notification_preferences"
+    __table_args__ = (
+        ForeignKeyConstraint(
+            ["user_id", "university_id"],
+            ["university_memberships.user_id", "university_memberships.university_id"],
+            ondelete="RESTRICT",
+            name="fk_notification_preferences_membership",
+        ),
+        UniqueConstraint(
+            "user_id",
+            "university_id",
+            "notification_type",
+            "channel",
+            name="uq_notification_preferences_user_university_type_channel",
+        ),
+        CheckConstraint(
+            "length(btrim(notification_type)) > 0",
+            name="ck_notification_preferences_type_nonempty",
+        ),
+        CheckConstraint(
+            "channel = 'in_app'",
+            name="ck_notification_preferences_channel",
+        ),
+    )
+
+    id: Mapped[uuid.UUID] = _uuid_column()
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="RESTRICT"),
+        nullable=False,
+    )
+    university_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("universities.id", ondelete="RESTRICT"),
+        nullable=False,
+    )
+    notification_type: Mapped[str] = mapped_column(String(64), nullable=False)
+    channel: Mapped[str] = mapped_column(
+        String(32),
+        nullable=False,
+        default="in_app",
+        server_default="in_app",
+    )
+    is_enabled: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+        default=True,
+        server_default=true(),
+    )
+
+    user: Mapped["User"] = relationship(back_populates="notification_preferences")
+    university: Mapped["University"] = relationship(back_populates="notification_preferences")

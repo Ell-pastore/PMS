@@ -49,6 +49,10 @@ class University(TimestampMixin, Base):
     faculties: Mapped[list["Faculty"]] = relationship(back_populates="university", passive_deletes=True)
     memberships: Mapped[list["UniversityMembership"]] = relationship(back_populates="university", passive_deletes=True)
     settings: Mapped[Optional["UniversitySettings"]] = relationship(back_populates="university", uselist=False, passive_deletes=True)
+    notification_preferences: Mapped[list["NotificationPreference"]] = relationship(
+        back_populates="university",
+        passive_deletes=True,
+    )
 
 class UniversityMembership(TimestampMixin, Base):
     """A university membership whose active state is an authorization concern.

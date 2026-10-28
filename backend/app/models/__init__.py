@@ -26,7 +26,7 @@ from .grant_award import (
 )
 from .grant_opportunity import FundingOpportunity, GrantOpportunity
 from .milestone import MilestoneTemplate, ProjectMilestone
-from .notification import Notification
+from .notification import Notification, NotificationPreference
 from .progress_report import (
     ProjectComment,
     ProgressReport,
@@ -100,6 +100,7 @@ __all__ = [
     "INITIAL_ROLE_CODES",
     "MilestoneTemplate",
     "Notification",
+    "NotificationPreference",
     "Permission",
     "ProjectComment",
     "ProjectMilestone",

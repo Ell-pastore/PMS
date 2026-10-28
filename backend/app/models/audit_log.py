@@ -47,7 +47,42 @@ class AuditLog(Base):
             ondelete="RESTRICT",
             name="fk_audit_logs_actor_membership",
         ),
-        Index("ix_audit_logs_entity_event", "entity_type", "entity_id", "event_at"),
+        CheckConstraint(
+            """
+            (entity_uuid IS NULL AND entity_integer IS NULL)
+            OR (
+                entity_uuid IS NULL
+                AND entity_integer IS NOT NULL
+                AND entity_type IN (
+                    'users', 'roles', 'user_roles', 'faculties',
+                    'departments', 'student_profiles', 'staff_profiles'
+                )
+            )
+            OR (
+                entity_uuid IS NOT NULL
+                AND entity_integer IS NULL
+                AND entity_type NOT IN (
+                    'users', 'roles', 'user_roles', 'faculties',
+                    'departments', 'student_profiles', 'staff_profiles'
+                )
+            )
+            """,
+            name="ck_audit_logs_entity_identifier_type",
+        ),
+        Index(
+            "ix_audit_logs_entity_uuid_event",
+            "entity_type",
+            "entity_uuid",
+            "event_at",
+            postgresql_where=text("entity_uuid IS NOT NULL"),
+        ),
+        Index(
+            "ix_audit_logs_entity_integer_event",
+            "entity_type",
+            "entity_integer",
+            "event_at",
+            postgresql_where=text("entity_integer IS NOT NULL"),
+        ),
         Index("ix_audit_logs_request_id", "request_id"),
     )
 
@@ -56,7 +91,8 @@ class AuditLog(Base):
     acting_user_id: Mapped[Optional[int]] = mapped_column(ForeignKey("users.id", ondelete="RESTRICT"), nullable=True)
     action: Mapped[str] = mapped_column(String(128), nullable=False)
     entity_type: Mapped[str] = mapped_column(String(128), nullable=False)
-    entity_id: Mapped[Optional[uuid.UUID]] = mapped_column(Uuid(as_uuid=True), nullable=True)
+    entity_uuid: Mapped[Optional[uuid.UUID]] = mapped_column(Uuid(as_uuid=True), nullable=True)
+    entity_integer: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     event_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
     request_id: Mapped[Optional[str]] = mapped_column(String(128), nullable=True)
     audit_metadata: Mapped[dict] = mapped_column(
