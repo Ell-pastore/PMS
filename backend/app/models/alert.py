@@ -99,7 +99,7 @@ class DuplicateTopicCandidate(Base):
 
     id: Mapped[uuid.UUID] = _uuid_column()
     university_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("universities.id", ondelete="RESTRICT"), nullable=False)
-    alert_event_id: Mapped[uuid.UUID] = mapped_column(nullable=False, unique=True)
+    alert_event_id: Mapped[uuid.UUID] = mapped_column(nullable=False)
     topic_a_id: Mapped[uuid.UUID] = mapped_column(nullable=False)
     topic_b_id: Mapped[uuid.UUID] = mapped_column(nullable=False)
     review_status: Mapped[str] = mapped_column(String(32), nullable=False, default="pending", server_default="pending")

@@ -82,6 +82,31 @@ def test_profiles_are_university_scoped_collections() -> None:
     assert Base.metadata.tables["staff_profiles"].c.user_id.unique is not True
 
 
+def test_duplicate_unique_constraints_are_not_declared() -> None:
+    expected_unique_constraints = {
+        "university_memberships": {
+            ("university_id", "user_id"): "uq_university_memberships_university_user",
+        },
+        "grant_awards": {
+            ("application_id",): "uq_grant_awards_application",
+            ("award_reference",): "uq_grant_awards_reference",
+        },
+        "duplicate_topic_candidates": {
+            ("alert_event_id",): "uq_duplicate_topic_candidates_alert",
+        },
+    }
+
+    for table_name, expected in expected_unique_constraints.items():
+        table = Base.metadata.tables[table_name]
+        actual = {
+            tuple(column.name for column in constraint.columns): constraint.name
+            for constraint in table.constraints
+            if constraint.__class__.__name__ == "UniqueConstraint"
+        }
+        for columns, constraint_name in expected.items():
+            assert actual[columns] == constraint_name
+
+
 def test_one_user_can_hold_student_and_staff_profiles_at_two_universities() -> None:
     user = User(full_name="Global User", email="global@example.test", password_hash="hash")
     university_a = uuid.uuid4()

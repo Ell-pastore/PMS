@@ -63,8 +63,8 @@ class GrantAward(TimestampMixin, Base):
 
     id: Mapped[uuid.UUID] = _uuid_column()
     university_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("universities.id", ondelete="RESTRICT"), nullable=False)
-    application_id: Mapped[uuid.UUID] = mapped_column(nullable=False, unique=True)
-    award_reference: Mapped[str] = mapped_column(String(128), nullable=False, unique=True)
+    application_id: Mapped[uuid.UUID] = mapped_column(nullable=False)
+    award_reference: Mapped[str] = mapped_column(String(128), nullable=False)
     awarded_amount: Mapped[Decimal] = mapped_column(Numeric(14, 2), nullable=False)
     currency: Mapped[str] = mapped_column(String(3), nullable=False)
     award_start_date: Mapped[date] = mapped_column(Date, nullable=False)

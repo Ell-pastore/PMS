@@ -279,7 +279,6 @@ Table duplicate_topic_candidates {
   reviewed_at timestamptz
   indexes {
   (alert_event_id) [unique, name: 'uq_duplicate_topic_candidates_alert']
-  (alert_event_id) [unique]
   }
   checks {
     `topic_a_id < topic_b_id` [name: 'ck_duplicate_topic_candidates_order']
@@ -378,11 +377,9 @@ Table grant_awards {
   created_at timestamptz [not null, default: `now()`]
   updated_at timestamptz [not null, default: `now()`, note: 'ORM onupdate: now()']
   indexes {
-  (award_reference) [unique]
   (award_reference) [unique, name: 'uq_grant_awards_reference']
   (application_id) [unique, name: 'uq_grant_awards_application']
   (id, university_id) [unique, name: 'uq_grant_awards_id_university']
-  (application_id) [unique]
   }
   checks {
     `awarded_amount >= 0` [name: 'ck_grant_awards_amount']
@@ -1073,7 +1070,6 @@ Table university_memberships {
   updated_at timestamptz [not null, default: `now()`, note: 'ORM onupdate: now()']
   indexes {
   (university_id, user_id) [unique, name: 'uq_university_memberships_university_user']
-  (user_id, university_id) [unique, name: 'uq_university_memberships_user_university']
   }
 }
 

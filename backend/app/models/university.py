@@ -66,7 +66,6 @@ class UniversityMembership(TimestampMixin, Base):
     __tablename__ = "university_memberships"
     __table_args__ = (
         UniqueConstraint("university_id", "user_id", name="uq_university_memberships_university_user"),
-        UniqueConstraint("user_id", "university_id", name="uq_university_memberships_user_university"),
     )
 
     id: Mapped[uuid.UUID] = _uuid_column()

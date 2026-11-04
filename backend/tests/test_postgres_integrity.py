@@ -25,7 +25,7 @@ from backend.app.models import Base
 
 TEST_DATABASE_ENV = "PMS_TEST_DATABASE_URL"
 DEVELOPMENT_DATABASE = "pms_db"
-EXPECTED_ALEMBIC_HEAD = "e7f9a1c3b5d7"
+EXPECTED_ALEMBIC_HEAD = "b1c2d3e4f5a6"
 
 
 @dataclass(frozen=True)
