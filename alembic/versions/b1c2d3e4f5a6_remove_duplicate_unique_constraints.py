@@ -16,28 +16,20 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
-    # Keep the named constraints defined in the ORM.  These are the duplicate
+    # Keep the named constraints defined in the ORM. These are the duplicate
     # constraints emitted by the previous migration's reversed composite
     # unique declaration and column-level unique=True declarations.
-    op.drop_constraint(
-        "uq_university_memberships_user_university",
-        "university_memberships",
-        type_="unique",
+    op.execute(
+        "ALTER TABLE university_memberships DROP CONSTRAINT IF EXISTS uq_university_memberships_user_university"
     )
-    op.drop_constraint(
-        "duplicate_topic_candidates_alert_event_id_key",
-        "duplicate_topic_candidates",
-        type_="unique",
+    op.execute(
+        "ALTER TABLE duplicate_topic_candidates DROP CONSTRAINT IF EXISTS duplicate_topic_candidates_alert_event_id_key"
     )
-    op.drop_constraint(
-        "grant_awards_application_id_key",
-        "grant_awards",
-        type_="unique",
+    op.execute(
+        "ALTER TABLE grant_awards DROP CONSTRAINT IF EXISTS grant_awards_application_id_key"
     )
-    op.drop_constraint(
-        "grant_awards_award_reference_key",
-        "grant_awards",
-        type_="unique",
+    op.execute(
+        "ALTER TABLE grant_awards DROP CONSTRAINT IF EXISTS grant_awards_award_reference_key"
     )
 
 
