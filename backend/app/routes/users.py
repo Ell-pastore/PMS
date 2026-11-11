@@ -217,6 +217,7 @@ def assign_user_role(
     data: UserRoleCreate,
     db: Session = Depends(get_db),
     tenant: TenantContext = Depends(get_tenant_context),
+    _admin: TenantContext = Depends(require_roles("university_admin")),
 ):
     return UserRoleController.assign_role(db, tenant, data)
 
@@ -240,6 +241,7 @@ def revoke_user_role(
     user_role_id: int,
     db: Session = Depends(get_db),
     tenant: TenantContext = Depends(get_tenant_context),
+    _admin: TenantContext = Depends(require_roles("university_admin")),
 ):
     return UserRoleController.revoke_role(db, tenant, user_role_id)
 
@@ -249,5 +251,6 @@ def delete_user_role(
     user_role_id: int,
     db: Session = Depends(get_db),
     tenant: TenantContext = Depends(get_tenant_context),
+    _admin: TenantContext = Depends(require_roles("university_admin")),
 ):
     return UserRoleController.delete_user_role(db, tenant, user_role_id)

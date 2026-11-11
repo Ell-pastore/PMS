@@ -6,7 +6,7 @@ import uuid
 from datetime import datetime, timezone
 from typing import Optional, Sequence
 
-from sqlalchemy import or_, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
 from ..core.exceptions import (
@@ -20,6 +20,10 @@ from ..models import (
     Department,
     DepartmentLeadership,
     Faculty,
+    ProjectParticipant,
+    ProjectSupervisor,
+    ProposalParticipant,
+    ProposalSupervisor,
     ResearchProposal,
     ResearchProject,
     StaffProfile,
@@ -484,6 +488,17 @@ class StaffProfileService:
     @staticmethod
     def delete_profile(db: Session, university_id: uuid.UUID, profile_id: int) -> None:
         profile = StaffProfileService.get_profile(db, university_id, profile_id)
+        blockers: list[str] = []
+        if db.scalar(select(func.count()).select_from(ProposalSupervisor).where(ProposalSupervisor.staff_id == profile.id)):
+            blockers.append("proposal supervisor assignments")
+        if db.scalar(select(func.count()).select_from(ProjectSupervisor).where(ProjectSupervisor.staff_id == profile.id)):
+            blockers.append("project supervisor assignments")
+        if db.scalar(select(func.count()).select_from(DepartmentLeadership).where(DepartmentLeadership.staff_id == profile.id)):
+            blockers.append("department leadership assignments")
+        if blockers:
+            raise SpecializedOperationError(
+                f"Cannot delete staff profile with existing {', '.join(blockers)}. Remove them first."
+            )
         db.delete(profile)
         db.commit()
 
@@ -610,6 +625,15 @@ class StudentProfileService:
     @staticmethod
     def delete_profile(db: Session, university_id: uuid.UUID, profile_id: int) -> None:
         profile = StudentProfileService.get_profile(db, university_id, profile_id)
+        blockers: list[str] = []
+        if db.scalar(select(func.count()).select_from(ProposalParticipant).where(ProposalParticipant.student_id == profile.id)):
+            blockers.append("proposal participant assignments")
+        if db.scalar(select(func.count()).select_from(ProjectParticipant).where(ProjectParticipant.student_id == profile.id)):
+            blockers.append("project participant assignments")
+        if blockers:
+            raise SpecializedOperationError(
+                f"Cannot delete student profile with existing {', '.join(blockers)}. Remove them first."
+            )
         db.delete(profile)
         db.commit()
 

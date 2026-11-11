@@ -15,7 +15,7 @@ from ..controller.approvals import (
     ApprovalVersionController,
     ApprovalWorkflowController,
 )
-from ..core.dependencies import TenantContext, get_db, get_tenant_context
+from ..core.dependencies import TenantContext, get_db, get_tenant_context, require_roles
 from ..core.pagination import PaginatedResponse, PaginationParams
 from ..schemas.approvals import (
     ApprovalActionCreate,
@@ -41,6 +41,7 @@ def create_workflow(
     data: ApprovalWorkflowCreate,
     db: Session = Depends(get_db),
     tenant: TenantContext = Depends(get_tenant_context),
+    _admin: TenantContext = Depends(require_roles("research_admin", "university_admin")),
 ):
     return ApprovalWorkflowController.create_workflow(db, tenant, data)
 
@@ -74,6 +75,7 @@ def update_workflow(
     data: ApprovalWorkflowUpdate,
     db: Session = Depends(get_db),
     tenant: TenantContext = Depends(get_tenant_context),
+    _admin: TenantContext = Depends(require_roles("research_admin", "university_admin")),
 ):
     return ApprovalWorkflowController.update_workflow(db, tenant, workflow_id, data)
 
@@ -83,6 +85,7 @@ def delete_workflow(
     workflow_id: uuid.UUID,
     db: Session = Depends(get_db),
     tenant: TenantContext = Depends(get_tenant_context),
+    _admin: TenantContext = Depends(require_roles("research_admin", "university_admin")),
 ):
     return ApprovalWorkflowController.delete_workflow(db, tenant, workflow_id)
 
@@ -93,6 +96,7 @@ def create_version(
     workflow_id: uuid.UUID,
     db: Session = Depends(get_db),
     tenant: TenantContext = Depends(get_tenant_context),
+    _admin: TenantContext = Depends(require_roles("research_admin", "university_admin")),
 ):
     return ApprovalVersionController.create_version(db, tenant, workflow_id)
 
@@ -112,6 +116,7 @@ def publish_version(
     version_id: uuid.UUID,
     db: Session = Depends(get_db),
     tenant: TenantContext = Depends(get_tenant_context),
+    _admin: TenantContext = Depends(require_roles("research_admin", "university_admin")),
 ):
     return ApprovalVersionController.publish_version(db, tenant, workflow_id, version_id)
 
@@ -122,6 +127,7 @@ def delete_version(
     version_id: uuid.UUID,
     db: Session = Depends(get_db),
     tenant: TenantContext = Depends(get_tenant_context),
+    _admin: TenantContext = Depends(require_roles("research_admin", "university_admin")),
 ):
     return ApprovalVersionController.delete_version(db, tenant, workflow_id, version_id)
 
@@ -134,6 +140,7 @@ def add_step(
     data: ApprovalWorkflowStepCreate,
     db: Session = Depends(get_db),
     tenant: TenantContext = Depends(get_tenant_context),
+    _admin: TenantContext = Depends(require_roles("research_admin", "university_admin")),
 ):
     return ApprovalStepController.add_step(db, tenant, workflow_id, version_id, data)
 
@@ -168,6 +175,7 @@ def update_step(
     data: ApprovalWorkflowStepUpdate,
     db: Session = Depends(get_db),
     tenant: TenantContext = Depends(get_tenant_context),
+    _admin: TenantContext = Depends(require_roles("research_admin", "university_admin")),
 ):
     return ApprovalStepController.update_step(db, tenant, workflow_id, version_id, step_id, data)
 
@@ -179,6 +187,7 @@ def delete_step(
     step_id: uuid.UUID,
     db: Session = Depends(get_db),
     tenant: TenantContext = Depends(get_tenant_context),
+    _admin: TenantContext = Depends(require_roles("research_admin", "university_admin")),
 ):
     return ApprovalStepController.delete_step(db, tenant, workflow_id, version_id, step_id)
 

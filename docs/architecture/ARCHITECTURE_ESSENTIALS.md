@@ -37,10 +37,10 @@ See `backend/requirements.txt`.
 2. **Tenant isolation by `university_id`.** Every tenant-scoped table and service query is filtered by `tenant.university_id`. Cross-tenant access returns 404.
 3. **Composite foreign keys.** `(child_column, university_id) → (parent_column, parent.university_id)`, `ondelete="RESTRICT"`.
 4. **Single transaction per service op.** `db.flush()` then one `db.commit()` — never multiple commits in one business operation.
-5. **Role checks only on admin routes.** Domain routes enforce tenant isolation only (intentional).
+5. **Role checks on admin + domain mutation routes.** Reads stay member-open; mutations require the matching domain role.
 6. **Custom HMAC tokens, no PyJWT.** Zero extra dependency. 24h expiry.
-7. **`superadmin` not seeded.** Bypass exists in code but requires manual role assignment.
-8. **Hard deletes + DB RESTRICT.** Structured delete guards on 4 domains only.
+7. **`superadmin` seeded as reference data.** Granted to no one; manual assignment activates the bypass.
+8. **Hard deletes + DB RESTRICT.** Service-level delete guards across all domains return structured 400s.
 
 ---
 

@@ -15,7 +15,7 @@ from ..controller.research_projects import (
     ProjectSupervisorController,
     ResearchProjectController,
 )
-from ..core.dependencies import TenantContext, get_db, get_tenant_context
+from ..core.dependencies import TenantContext, get_db, get_tenant_context, require_roles
 from ..core.pagination import PaginatedResponse, PaginationParams
 from ..schemas.research_projects import (
     MilestoneTemplateCreate,
@@ -191,6 +191,7 @@ def create_template(
     data: MilestoneTemplateCreate,
     db: Session = Depends(get_db),
     tenant: TenantContext = Depends(get_tenant_context),
+    _admin: TenantContext = Depends(require_roles("research_admin", "university_admin")),
 ):
     return MilestoneTemplateController.create_template(db, tenant, data)
 
@@ -225,6 +226,7 @@ def update_template(
     data: MilestoneTemplateUpdate,
     db: Session = Depends(get_db),
     tenant: TenantContext = Depends(get_tenant_context),
+    _admin: TenantContext = Depends(require_roles("research_admin", "university_admin")),
 ):
     return MilestoneTemplateController.update_template(db, tenant, template_id, data)
 
@@ -234,6 +236,7 @@ def delete_template(
     template_id: uuid.UUID,
     db: Session = Depends(get_db),
     tenant: TenantContext = Depends(get_tenant_context),
+    _admin: TenantContext = Depends(require_roles("research_admin", "university_admin")),
 ):
     return MilestoneTemplateController.delete_template(db, tenant, template_id)
 

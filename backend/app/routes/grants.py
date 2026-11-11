@@ -16,7 +16,7 @@ from ..controller.grants import (
     GrantOpportunityController,
     GrantProgressReportController,
 )
-from ..core.dependencies import TenantContext, get_db, get_tenant_context
+from ..core.dependencies import TenantContext, get_db, get_tenant_context, require_roles
 from ..core.pagination import PaginatedResponse, PaginationParams
 from ..schemas.grants import (
     GrantAllocationCreate,
@@ -55,6 +55,7 @@ def create_opportunity(
     data: GrantOpportunityCreate,
     db: Session = Depends(get_db),
     tenant: TenantContext = Depends(get_tenant_context),
+    _admin: TenantContext = Depends(require_roles("grant_admin", "university_admin")),
 ):
     return GrantOpportunityController.create_opportunity(db, tenant, data)
 
@@ -88,6 +89,7 @@ def update_opportunity(
     data: GrantOpportunityUpdate,
     db: Session = Depends(get_db),
     tenant: TenantContext = Depends(get_tenant_context),
+    _admin: TenantContext = Depends(require_roles("grant_admin", "university_admin")),
 ):
     return GrantOpportunityController.update_opportunity(db, tenant, opportunity_id, data)
 
@@ -97,6 +99,7 @@ def delete_opportunity(
     opportunity_id: uuid.UUID,
     db: Session = Depends(get_db),
     tenant: TenantContext = Depends(get_tenant_context),
+    _admin: TenantContext = Depends(require_roles("grant_admin", "university_admin")),
 ):
     return GrantOpportunityController.delete_opportunity(db, tenant, opportunity_id)
 
@@ -220,6 +223,7 @@ def create_award(
     data: GrantAwardCreate,
     db: Session = Depends(get_db),
     tenant: TenantContext = Depends(get_tenant_context),
+    _admin: TenantContext = Depends(require_roles("grant_admin", "university_admin")),
 ):
     return GrantAwardController.create_award(db, tenant, data)
 
@@ -252,6 +256,7 @@ def update_award(
     data: GrantAwardUpdate,
     db: Session = Depends(get_db),
     tenant: TenantContext = Depends(get_tenant_context),
+    _admin: TenantContext = Depends(require_roles("grant_admin", "university_admin")),
 ):
     return GrantAwardController.update_award(db, tenant, award_id, data)
 
@@ -261,6 +266,7 @@ def delete_award(
     award_id: uuid.UUID,
     db: Session = Depends(get_db),
     tenant: TenantContext = Depends(get_tenant_context),
+    _admin: TenantContext = Depends(require_roles("grant_admin", "university_admin")),
 ):
     return GrantAwardController.delete_award(db, tenant, award_id)
 
@@ -272,6 +278,7 @@ def create_allocation(
     data: GrantAllocationCreate,
     db: Session = Depends(get_db),
     tenant: TenantContext = Depends(get_tenant_context),
+    _admin: TenantContext = Depends(require_roles("grant_admin", "university_admin")),
 ):
     return GrantAllocationController.create_allocation(db, tenant, award_id, data)
 
@@ -291,6 +298,7 @@ def delete_allocation(
     allocation_id: uuid.UUID,
     db: Session = Depends(get_db),
     tenant: TenantContext = Depends(get_tenant_context),
+    _admin: TenantContext = Depends(require_roles("grant_admin", "university_admin")),
 ):
     return GrantAllocationController.delete_allocation(db, tenant, award_id, allocation_id)
 
@@ -302,6 +310,7 @@ def record_expenditure(
     data: GrantExpenditureCreate,
     db: Session = Depends(get_db),
     tenant: TenantContext = Depends(get_tenant_context),
+    _admin: TenantContext = Depends(require_roles("grant_admin", "university_admin")),
 ):
     return GrantExpenditureController.record_expenditure(db, tenant, award_id, data)
 
@@ -333,6 +342,7 @@ def update_expenditure(
     data: GrantExpenditureUpdate,
     db: Session = Depends(get_db),
     tenant: TenantContext = Depends(get_tenant_context),
+    _admin: TenantContext = Depends(require_roles("grant_admin", "university_admin")),
 ):
     return GrantExpenditureController.update_expenditure(db, tenant, expenditure_id, data)
 
@@ -342,6 +352,7 @@ def delete_expenditure(
     expenditure_id: uuid.UUID,
     db: Session = Depends(get_db),
     tenant: TenantContext = Depends(get_tenant_context),
+    _admin: TenantContext = Depends(require_roles("grant_admin", "university_admin")),
 ):
     return GrantExpenditureController.delete_expenditure(db, tenant, expenditure_id)
 

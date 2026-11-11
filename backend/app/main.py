@@ -19,3 +19,11 @@ app.include_router(api_router)
 def health_check() -> dict[str, str]:
     """Return a lightweight application health response."""
     return {"status": "ok"}
+
+
+if __name__ == "__main__":
+    # Convenience entry point for `python -m backend.app.main` (run from repo root).
+    # Preferred: `.venv/bin/uvicorn backend.app.main:app --reload`
+    import uvicorn
+
+    uvicorn.run("backend.app.main:app", host="127.0.0.1", port=8000, reload=True)

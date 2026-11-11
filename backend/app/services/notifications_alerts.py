@@ -6,7 +6,7 @@ import uuid
 from datetime import datetime, timezone
 from typing import Optional, Sequence
 
-from sqlalchemy import or_, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
 from ..core.exceptions import (
@@ -14,6 +14,7 @@ from ..core.exceptions import (
     ForbiddenError,
     ForeignKeyViolationError,
     NotFoundError,
+    SpecializedOperationError,
 )
 from ..core.pagination import PaginationParams, paginate
 from ..models import (
@@ -321,6 +322,10 @@ class AlertRuleService:
     @staticmethod
     def delete_rule(db: Session, university_id: uuid.UUID, rule_id: uuid.UUID) -> None:
         rule = AlertRuleService.get_rule(db, university_id, rule_id)
+        if db.scalar(select(func.count()).select_from(AlertEvent).where(AlertEvent.rule_id == rule.id)):
+            raise SpecializedOperationError(
+                "Cannot delete alert rule with existing alert events. Events are part of the audit trail."
+            )
         db.delete(rule)
         db.commit()
 

@@ -104,6 +104,7 @@ def add_membership(
     data: UniversityMembershipCreate,
     db: Session = Depends(get_db),
     tenant: TenantContext = Depends(get_tenant_context),
+    _admin: TenantContext = Depends(require_roles("university_admin")),
 ):
     return UniversityMembershipController.add_membership(db, tenant, data)
 
@@ -137,6 +138,7 @@ def update_membership(
     data: UniversityMembershipUpdate,
     db: Session = Depends(get_db),
     tenant: TenantContext = Depends(get_tenant_context),
+    _admin: TenantContext = Depends(require_roles("university_admin")),
 ):
     return UniversityMembershipController.update_membership(db, tenant, membership_id, data)
 
@@ -146,6 +148,7 @@ def delete_membership(
     membership_id: uuid.UUID,
     db: Session = Depends(get_db),
     tenant: TenantContext = Depends(get_tenant_context),
+    _admin: TenantContext = Depends(require_roles("university_admin")),
 ):
     return UniversityMembershipController.delete_membership(db, tenant, membership_id)
 
@@ -165,6 +168,7 @@ def update_university_settings(
     data: UniversitySettingsUpdate,
     db: Session = Depends(get_db),
     tenant: TenantContext = Depends(get_tenant_context),
+    _admin: TenantContext = Depends(require_roles("university_admin")),
 ):
     return SettingsController.update_university_settings(db, tenant, data)
 
@@ -185,6 +189,7 @@ def update_department_settings(
     data: DepartmentSettingsUpdate,
     db: Session = Depends(get_db),
     tenant: TenantContext = Depends(get_tenant_context),
+    _admin: TenantContext = Depends(require_roles("university_admin")),
 ):
     return SettingsController.update_department_settings(db, tenant, department_id, data)
 
@@ -194,6 +199,7 @@ def create_system_setting(
     data: SystemSettingCreate,
     db: Session = Depends(get_db),
     tenant: TenantContext = Depends(get_tenant_context),
+    _admin: TenantContext = Depends(require_roles("university_admin")),
 ):
     return SettingsController.create_system_setting(db, tenant, data)
 
@@ -224,6 +230,7 @@ def update_system_setting(
     data: SystemSettingUpdate,
     db: Session = Depends(get_db),
     tenant: TenantContext = Depends(get_tenant_context),
+    _admin: TenantContext = Depends(require_roles("university_admin")),
 ):
     return SettingsController.update_system_setting(db, tenant, setting_key, data)
 
@@ -233,6 +240,7 @@ def delete_system_setting(
     setting_key: str,
     db: Session = Depends(get_db),
     tenant: TenantContext = Depends(get_tenant_context),
+    _admin: TenantContext = Depends(require_roles("university_admin")),
 ):
     return SettingsController.delete_system_setting(db, tenant, setting_key)
 

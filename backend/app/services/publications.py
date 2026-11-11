@@ -7,7 +7,7 @@ import uuid
 from datetime import datetime, timezone
 from typing import Optional, Sequence
 
-from sqlalchemy import or_, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
 from ..core.exceptions import (
@@ -15,6 +15,7 @@ from ..core.exceptions import (
     ForeignKeyViolationError,
     InvalidInputError,
     NotFoundError,
+    SpecializedOperationError,
 )
 from ..core.pagination import PaginationParams, paginate
 from ..models import (
@@ -180,6 +181,17 @@ class PublicationService:
     @staticmethod
     def delete_publication(db: Session, university_id: uuid.UUID, publication_id: uuid.UUID) -> None:
         pub = PublicationService.get_publication(db, university_id, publication_id)
+        blockers: list[str] = []
+        if db.scalar(select(func.count()).select_from(PublicationAuthor).where(PublicationAuthor.publication_id == pub.id)):
+            blockers.append("authors")
+        if db.scalar(select(func.count()).select_from(PublicationProject).where(PublicationProject.publication_id == pub.id)):
+            blockers.append("linked projects")
+        if db.scalar(select(func.count()).select_from(PublicationReview).where(PublicationReview.publication_id == pub.id)):
+            blockers.append("reviews")
+        if blockers:
+            raise SpecializedOperationError(
+                f"Cannot delete publication with existing {', '.join(blockers)}. Remove them first."
+            )
         db.delete(pub)
         db.commit()
 

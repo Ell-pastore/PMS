@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session
 
 from backend.app.models import Role, UserRole
 from backend.tests.conftest import (
+    assign_role_helper,
     create_membership_helper,
     create_university_admin_helper,
     create_university_helper,
@@ -467,4 +468,7 @@ def _setup_two_tenants_api(db: Session):
     univ_b = create_university_helper(db)
     create_membership_helper(db, univ_a.id, user_a.id)
     create_membership_helper(db, univ_b.id, user_b.id)
+    # Grant setup rights so gated creation calls succeed; isolation must still hold.
+    assign_role_helper(db, univ_a.id, user_a.id, "university_admin")
+    assign_role_helper(db, univ_b.id, user_b.id, "university_admin")
     return user_a, univ_a, user_b, univ_b

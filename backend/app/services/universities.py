@@ -5,23 +5,28 @@ from __future__ import annotations
 import uuid
 from typing import Optional, Sequence
 
-from sqlalchemy import or_, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
 from ..core.exceptions import (
     DuplicateResourceError,
     ForeignKeyViolationError,
     NotFoundError,
+    SpecializedOperationError,
 )
 from ..core.pagination import PaginationParams, paginate
 from ..models import (
     Department,
     DepartmentSettings,
+    Faculty,
+    StaffProfile,
+    StudentProfile,
     SystemSetting,
     University,
     UniversityMembership,
     UniversitySettings,
     User,
+    UserRole,
 )
 from ..schemas.universities import (
     DepartmentSettingsCreate,
@@ -94,6 +99,23 @@ class UniversityService:
     @staticmethod
     def delete_university(db: Session, university_id: uuid.UUID) -> None:
         university = UniversityService.get_university(db, university_id)
+
+        # Guard against deleting a university that still holds tenant data
+        # (RESTRICT foreign keys would otherwise surface as a raw integrity
+        # error). Domain records referencing the university keep it retained.
+        blockers: list[str] = []
+        if db.scalar(select(func.count()).select_from(UniversityMembership).where(UniversityMembership.university_id == university.id)):
+            blockers.append("members")
+        if db.scalar(select(func.count()).select_from(Faculty).where(Faculty.university_id == university.id)):
+            blockers.append("faculties")
+        if db.scalar(select(func.count()).select_from(Department).where(Department.university_id == university.id)):
+            blockers.append("departments")
+        if db.scalar(select(func.count()).select_from(UniversitySettings).where(UniversitySettings.university_id == university.id)):
+            blockers.append("settings")
+        if blockers:
+            raise SpecializedOperationError(
+                f"Cannot delete university with existing {', '.join(blockers)}. Remove them first."
+            )
         db.delete(university)
         db.commit()
 
@@ -172,6 +194,36 @@ class UniversityMembershipService:
     @staticmethod
     def delete_membership(db: Session, university_id: uuid.UUID, membership_id: uuid.UUID) -> None:
         membership = UniversityMembershipService.get_membership(db, university_id, membership_id)
+
+        # Guard against deleting a membership that still holds user data
+        # (RESTRICT composite foreign keys would otherwise surface as a raw
+        # integrity error). Historical records keep the membership retained.
+        blockers: list[str] = []
+        if db.scalar(
+            select(func.count()).select_from(UserRole).where(
+                UserRole.user_id == membership.user_id,
+                UserRole.university_id == membership.university_id,
+            )
+        ):
+            blockers.append("role assignments")
+        if db.scalar(
+            select(func.count()).select_from(StaffProfile).where(
+                StaffProfile.user_id == membership.user_id,
+                StaffProfile.university_id == membership.university_id,
+            )
+        ):
+            blockers.append("staff profiles")
+        if db.scalar(
+            select(func.count()).select_from(StudentProfile).where(
+                StudentProfile.user_id == membership.user_id,
+                StudentProfile.university_id == membership.university_id,
+            )
+        ):
+            blockers.append("student profiles")
+        if blockers:
+            raise SpecializedOperationError(
+                f"Cannot delete membership with existing {', '.join(blockers)}. Remove them first."
+            )
         db.delete(membership)
         db.commit()
 

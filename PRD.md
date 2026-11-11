@@ -43,7 +43,7 @@ A single, tenant-isolated platform that manages the full research lifecycle for 
 | O6 | Track project progress via milestones and progress reports | Implemented |
 | O7 | Manage grant opportunities, applications, awards, expenditures | Implemented |
 | O8 | Manage publications and verification workflow | Implemented |
-| O9 | Enforce role-based access on administrative routes | Partially implemented (global admin routes only) |
+| O9 | Enforce role-based access on administrative routes | Implemented (global admin routes plus domain-level RBAC) |
 | O10 | Provide structured error handling and pagination | Implemented |
 
 ## 5. Target users and personas
@@ -56,17 +56,17 @@ A single, tenant-isolated platform that manages the full research lifecycle for 
 | Research Admin | Administers research administration | Topic/department setup, proposal review |
 | Grant Admin | Manages grant lifecycle | Opportunities, applications, awards, expenditures |
 | University Admin | University-level administrator | User/role/university management, global admin routes |
-| Superadmin | Cross-tenant bypass role (referenced in code, not seeded) | Operate across universities (requires manual role assignment) |
+| Superadmin | Cross-tenant bypass role (seeded as reference data; assignment is manual) | Operate across universities (requires manual role assignment) |
 
 ## 6. User roles and permissions
 
-Role codes seeded as reference data: `student`, `supervisor`, `department_head`, `research_admin`, `grant_admin`, `university_admin`.
+Role codes seeded as reference data: `student`, `supervisor`, `department_head`, `research_admin`, `grant_admin`, `university_admin`, `superadmin`.
 
 - Roles are assigned to users within a specific university (`user_roles`, scoped by `university_id`).
 - `user_roles` has an active-assignment partial unique index on `(university_id, user_id, role_id)` where `revoked_at IS NULL`; roles can be revoked by setting `revoked_at`.
 - Permissions (`permissions` table) are linked to roles via `role_permissions`.
-- A `superadmin` role code is referenced by `dependencies.py` (superadmin bypass in `TenantContext.has_role` and `get_tenant_context`) but is **not** seeded; it can only be exercised by manually assigning a `superadmin` role row.
-- Authorization is enforced primarily through tenant scoping (`university_id`) on every service query. Role-based checks (`require_roles`) are applied to administrative global routes (users, roles, permissions, universities); domain routes (proposals, projects, grants, etc.) rely on tenant isolation only.
+- A `superadmin` role code is seeded with the other reference roles; the bypass in `TenantContext.has_role` and `get_tenant_context` activates only once the role is manually assigned to a user (seeding grants it to no one).
+- Authorization is enforced through tenant scoping (`university_id`) on every service query plus route-level role checks: `require_roles("university_admin")` on global administrative routes, and domain-level gates on organizational and administrative mutations (see `docs/product/USER_ROLES.md` for the full access matrix). Collaborative domain work (proposals, projects, milestones, progress reports, publications, grant applications, notifications) remains open to any active tenant member.
 
 See `docs/product/USER_ROLES.md` for details.
 
@@ -96,7 +96,7 @@ See `docs/product/USER_ROLES.md` for details.
 
 **FR-2 (Tenancy)** Every tenant-scoped request must supply `X-University-ID` (or `university_id` query). The tenant is verified: university must exist and be active; the user must have an active membership (superadmin bypasses membership check).
 
-**FR-3 (RBAC on admin routes)** `require_roles("university_admin")` guards university, role, permission, and user-list administration. `superadmin` bypasses all role checks. Self-access to one's own user record is preserved.
+**FR-3 (RBAC on admin routes)** `require_roles("university_admin")` guards university, role, permission, user-list, membership, settings, and user-role assignment administration. `superadmin` bypasses all role checks. Self-access to one's own user record is preserved.
 
 **FR-4 (Tenant isolation)** All service queries scope by `university_id`; composite foreign keys include `university_id`; indexes are `(id, university_id)` unique pairs. Cross-tenant access returns 404.
 
@@ -108,24 +108,27 @@ See `docs/product/USER_ROLES.md` for details.
 
 **FR-8 (Grant lifecycle)** Opportunities → applications → awards → expenditures → grant progress reports, with project allocations linking awards to projects.
 
-**FR-9 (Delete guards)** `SpecializedOperationError` (400) raised when deleting a topic referenced by proposals, a faculty with departments, a department with dependent profiles/proposals/projects/leadership, or a grant opportunity with applications.
+**FR-9 (Delete guards)** `SpecializedOperationError` (400, `RESTRICTED_OPERATION`) raised when deleting an entity still referenced by user-created or cross-domain data: topics referenced by proposals, faculties with departments, departments with dependent profiles/proposals/projects/leadership, grant opportunities with applications, proposals (unless draft, and without projects/revisions/participants/supervisors/reviews), projects (without milestones/participants/supervisors/reports/comments/publication or grant links), grant applications (unless draft, and without awards/participants/reviews), grant awards (without expenditures/allocations/reports), publications (without authors/project links/reviews), milestones (without reports/comments), templates (without milestones), progress reports (unless draft, and without reviews/comments), alert rules (without events), stored files (hard delete with attachments), staff/student profiles (without supervisor/participant/leadership assignments), users (without memberships/role assignments/profiles), roles (without assignments), universities (without members/faculties/departments/settings), and memberships (without role assignments/profiles). Machine-derived bookkeeping rows (status history, draft workflow versions and steps, account verification tokens) are cascaded within the same transaction.
 
 **FR-10 (Single-transaction creation)** Proposal, project, application, and approval-workflow creation flush then commit once, including initial status history/draft version.
 
 **FR-11 (Status validation)** Pydantic `pattern` validation on proposal (`draft|submitted|under_review|revision_requested|approved|rejected|withdrawn`) and project (`active|on_hold|completed|cancelled|archived`) status transitions.
 
+**FR-12 (Domain-level RBAC)** Mutations on organizational and administrative domain routes require the matching domain role via `require_roles(...)`: faculties/memberships/settings/user-role assignments require `university_admin`; departments and department leadership require `department_head` or `university_admin`; research topics, duplicate-candidate review, approval workflows/versions/steps, audit logs, retention policies, and milestone templates require `research_admin` or `university_admin`; grant opportunities, awards, expenditures, and allocations require `grant_admin` or `university_admin`. Reads and collaborative research work (proposals, projects, milestones, progress reports, publications, grant applications, notifications, files) remain open to any active member. `superadmin` bypasses all role checks.
+
+**FR-13 (Superadmin seed)** `superadmin` is part of `INITIAL_ROLE_CODES` reference data so the bypass path can be activated by assigning the role; seeding grants it to no one.
+
 ### 8.2 Proposed improvements (NOT implemented — future work)
 
 | ID | Requirement | Rationale | Status |
 |----|-------------|-----------|--------|
-| PF-1 | Domain-level RBAC (e.g., only `grant_admin` creates grant awards) | Finer-grained authorization | Not implemented — intentional exclusion |
-| PF-2 | Seed `superadmin` role | Enable superadmin bypass path | Not implemented — intentional exclusion |
-| PF-3 | Delete guards on remaining domains (projects, proposals, applications, awards, milestones) | Consistent structured errors | Not implemented |
 | PF-4 | Soft deletes instead of hard `db.delete()` | Preserve history | Not implemented |
 | PF-5 | Frontend application | User interface | Not implemented |
 | PF-6 | Email/SMS notification channels | Multi-channel alerts | Not implemented (only `in_app` channel constrained) |
 | PF-7 | OAuth / external identity providers | SSO | Not implemented |
 | PF-8 | File storage backend integration (S3, etc.) | Persistent attachments | Not implemented (stored_files tracks metadata only) |
+
+Previously proposed and now implemented: PF-1 (domain-level RBAC → FR-12), PF-2 (seeded `superadmin` → FR-13), PF-3 (delete guards on remaining domains → FR-9).
 
 ## 9. Non-functional requirements
 
@@ -207,9 +210,7 @@ Non-functional requirements such as uptime SLA, backup/restore, rate limiting, a
 
 The following are explicitly out of scope for the current release:
 - Frontend application of any kind.
-- Domain-level RBAC on non-administrative routes (intentional; see PF-1).
-- Seeded `superadmin` role (intentional; see PF-2).
-- Soft deletion (hard deletes with DB RESTRICT constraints only).
+- Soft deletion (hard deletes with DB RESTRICT constraints, guarded by service-level checks, only).
 - Real-time notifications, email, or push channels.
 - Third-party identity providers.
 - Scheduled background jobs.
@@ -221,7 +222,6 @@ See section 8.2 (proposed improvements) plus:
 - Rate limiting and request throttling.
 - OpenAPI client SDK generation.
 - Database read replicas / connection pooling tuning.
-- Comprehensive audit of remaining unguarded `delete_*` operations.
 
 ---
 

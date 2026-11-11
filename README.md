@@ -143,9 +143,14 @@ The `.env` file is loaded by `pydantic-settings` via `backend/app/core/config.py
 ## Running the Application
 
 ```bash
-# From the project root
+# From the project root (preferred)
 uvicorn backend.app.main:app --reload
+
+# Alternative: run the app module directly (also from the project root)
+python -m backend.app.main
 ```
+
+> Note: `python backend/app/main.py` does not work because the application uses package-relative imports; run it as a module (`python -m backend.app.main`) or via uvicorn from the project root. If `python` is not the virtualenv interpreter, use `.venv/bin/python -m backend.app.main` or `.venv/bin/uvicorn backend.app.main:app --reload`.
 
 The API will be available at `http://localhost:8000`. All API routes are mounted under `/api/v1`.
 
@@ -228,6 +233,9 @@ Important:
 ```bash
 # Run the API (development)
 uvicorn backend.app.main:app --reload
+
+# Run the API as a module
+python -m backend.app.main
 
 # Run the full test suite
 PMS_TEST_DATABASE_URL='postgresql+psycopg://apple@127.0.0.1:5433/pms_test_db' \

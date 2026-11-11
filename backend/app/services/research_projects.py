@@ -6,7 +6,7 @@ import uuid
 from datetime import datetime, timezone
 from typing import Optional, Sequence
 
-from sqlalchemy import or_, select
+from sqlalchemy import delete, func, or_, select
 from sqlalchemy.orm import Session
 
 from ..core.exceptions import (
@@ -19,11 +19,15 @@ from ..core.exceptions import (
 from ..core.pagination import PaginationParams, paginate
 from ..models import (
     Department,
+    GrantProjectAllocation,
     MilestoneTemplate,
+    ProgressReport,
+    ProjectComment,
     ProjectMilestone,
     ProjectParticipant,
     ProjectStatusHistory,
     ProjectSupervisor,
+    PublicationProject,
     ResearchProject,
     ResearchProposal,
     StaffProfile,
@@ -199,6 +203,33 @@ class ResearchProjectService:
     @staticmethod
     def delete_project(db: Session, university_id: uuid.UUID, project_id: uuid.UUID) -> None:
         project = ResearchProjectService.get_project(db, university_id, project_id)
+
+        # Guard against deleting a project that still has user-created data or
+        # cross-domain links (RESTRICT foreign keys would otherwise surface as
+        # a raw integrity error).
+        blockers: list[str] = []
+        if db.scalar(select(func.count()).select_from(ProjectMilestone).where(ProjectMilestone.project_id == project.id)):
+            blockers.append("milestones")
+        if db.scalar(select(func.count()).select_from(ProjectParticipant).where(ProjectParticipant.project_id == project.id)):
+            blockers.append("participants")
+        if db.scalar(select(func.count()).select_from(ProjectSupervisor).where(ProjectSupervisor.project_id == project.id)):
+            blockers.append("supervisors")
+        if db.scalar(select(func.count()).select_from(ProgressReport).where(ProgressReport.project_id == project.id)):
+            blockers.append("progress reports")
+        if db.scalar(select(func.count()).select_from(ProjectComment).where(ProjectComment.project_id == project.id)):
+            blockers.append("comments")
+        if db.scalar(select(func.count()).select_from(PublicationProject).where(PublicationProject.project_id == project.id)):
+            blockers.append("linked publications")
+        if db.scalar(select(func.count()).select_from(GrantProjectAllocation).where(GrantProjectAllocation.project_id == project.id)):
+            blockers.append("grant allocations")
+        if blockers:
+            raise SpecializedOperationError(
+                f"Cannot delete project with existing {', '.join(blockers)}. Remove them first."
+            )
+
+        # Cascade the project's own status history rows (written automatically
+        # at creation), then delete the project in a single transaction.
+        db.execute(delete(ProjectStatusHistory).where(ProjectStatusHistory.project_id == project.id))
         db.delete(project)
         db.commit()
 
@@ -549,6 +580,12 @@ class MilestoneTemplateService:
     @staticmethod
     def delete_template(db: Session, university_id: uuid.UUID, template_id: uuid.UUID) -> None:
         tpl = MilestoneTemplateService.get_template(db, university_id, template_id)
+        if db.scalar(
+            select(func.count()).select_from(ProjectMilestone).where(ProjectMilestone.template_id == template_id)
+        ):
+            raise SpecializedOperationError(
+                "Cannot delete milestone template with existing milestones. Remove the milestones first."
+            )
         db.delete(tpl)
         db.commit()
 
@@ -682,6 +719,15 @@ class ProjectMilestoneService:
     @staticmethod
     def delete_milestone(db: Session, university_id: uuid.UUID, milestone_id: uuid.UUID) -> None:
         milestone = ProjectMilestoneService.get_milestone(db, university_id, milestone_id)
+        blockers: list[str] = []
+        if db.scalar(select(func.count()).select_from(ProgressReport).where(ProgressReport.milestone_id == milestone.id)):
+            blockers.append("progress reports")
+        if db.scalar(select(func.count()).select_from(ProjectComment).where(ProjectComment.milestone_id == milestone.id)):
+            blockers.append("comments")
+        if blockers:
+            raise SpecializedOperationError(
+                f"Cannot delete milestone with existing {', '.join(blockers)}. Remove them first."
+            )
         db.delete(milestone)
         db.commit()
 

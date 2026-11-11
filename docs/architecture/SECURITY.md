@@ -61,8 +61,9 @@ PMS implements defense-in-depth security at the authentication, authorization, t
 - `research_admin`
 - `grant_admin`
 - `university_admin`
+- `superadmin`
 
-Note: `superadmin` is referenced in `dependencies.py` as a bypass but is **not seeded**.
+Note: `superadmin` is seeded as reference data only — seeding grants it to no one. It must be manually assigned to a user for the bypass paths to activate.
 
 ### Authorization Flow (`get_tenant_context` + `require_roles`)
 
@@ -95,10 +96,17 @@ sequenceDiagram
 | `GET /users` (list) | `university_admin` | N/A |
 | `GET/PATCH /users/{id}` | None (self) / `university_admin` (other) | Yes |
 | `DELETE /users/{id}` | `university_admin` | No |
-| `POST/GET/PUT/DELETE /roles` | `university_admin` | N/A |
-| `POST/GET /roles/permissions` | `university_admin` | N/A |
-| `POST/DELETE /roles/permissions/...` | `university_admin` | N/A |
-| University-scoped domain routes | Active membership | N/A |
+| `POST/GET/PUT/DELETE /roles`, `/roles/permissions` | `university_admin` | N/A |
+| `POST/POST revoke/DELETE /user-roles` | `university_admin` | N/A |
+| `POST/GET/PUT/DELETE /universities` | `university_admin` | N/A |
+| Memberships + settings mutations | `university_admin` | N/A |
+| `POST/PATCH/PUT/DELETE /faculties` | `university_admin` | N/A |
+| `POST/PATCH/PUT/DELETE /departments`, department leadership | `department_head` or `university_admin` | N/A |
+| Research topics, duplicate-candidate review, approval workflows/versions/steps, audit logs, retention policies, milestone templates | `research_admin` or `university_admin` | N/A |
+| Grant opportunities, awards, allocations, expenditures | `grant_admin` or `university_admin` | N/A |
+| Collaborative research routes (proposals, projects, milestones, progress reports, publications, grant applications, files, notifications) and all reads | Active membership | Yes |
+
+`superadmin` passes every `require_roles` gate. The full matrix is in [`USER_ROLES.md`](../product/USER_ROLES.md).
 
 ### Key Rules
 
@@ -106,6 +114,8 @@ sequenceDiagram
 - `superadmin` still requires tenant context (`get_tenant_context`) for university-scoped operations.
 - Cross-tenant resource access returns **404** (not 403) to avoid leaking existence.
 - Role checks belong in routes via `require_roles`, not hardcoded in services.
+- Reads stay open to all active members; only mutations on organizational/administrative routes are role-gated.
+- Deleting an entity still referenced by user-created data returns **400** `SpecializedOperationError` (`RESTRICTED_OPERATION`) instead of leaking raw integrity errors.
 
 ## Multi-Tenancy Security
 
@@ -227,8 +237,9 @@ PostgreSQL check constraints enforce domain rules as a second line of defense (s
 | Rate limiting | ❌ Not implemented | No rate limiting middleware |
 | CORS configuration | ❌ Not implemented | No CORS middleware configured |
 | Request size limits | ❌ Not implemented | No max body size configured |
-| `superadmin` seeding | ❌ Not seeded | Must be manually assigned if needed |
-| Domain-level RBAC | ❌ Not implemented | Only global `university_admin` routes are role-protected |
+| `superadmin` seeding | ✅ Seeded as reference data | Granted to no one; manual assignment required to activate |
+| Domain-level RBAC | ✅ Implemented | Mutations on organizational/administrative routes gated by matching domain role |
+| Delete guards | ✅ Implemented | Blocked deletes return 400 `RESTRICTED_OPERATION`; machine-derived rows cascade |
 | Soft deletion | ❌ Not implemented | Hard deletes; deleted data not recoverable |
 | Audit logging coverage | ⚠️ Partial | AuditLog model exists but service usage varies by domain |
 
@@ -236,6 +247,8 @@ PostgreSQL check constraints enforce domain rules as a second line of defense (s
 
 - [ ] New endpoints use `get_tenant_context` for university-scoped operations.
 - [ ] Admin endpoints use `require_roles("university_admin")` where appropriate.
+- [ ] Domain mutations use `require_roles(...)` with the matching domain role.
+- [ ] New delete operations guard against dependent data (`SpecializedOperationError`).
 - [ ] Self-access to user profiles is preserved.
 - [ ] Cross-tenant access returns 404, not 403.
 - [ ] Services filter all queries by `tenant.university_id`.

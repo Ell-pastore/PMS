@@ -6,7 +6,7 @@ import uuid
 from datetime import datetime, timezone
 from typing import Optional, Sequence
 
-from sqlalchemy import or_, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
 from ..core.exceptions import (
@@ -15,6 +15,7 @@ from ..core.exceptions import (
     ForeignKeyViolationError,
     InvalidInputError,
     NotFoundError,
+    SpecializedOperationError,
 )
 from ..core.pagination import PaginationParams, paginate
 from ..models import (
@@ -150,6 +151,12 @@ class StoredFileService:
     ) -> None:
         file_obj = StoredFileService.get_file(db, university_id, file_id, include_deleted=True)
         if hard_delete:
+            if db.scalar(
+                select(func.count()).select_from(DocumentAttachment).where(DocumentAttachment.stored_file_id == file_obj.id)
+            ):
+                raise SpecializedOperationError(
+                    "Cannot hard delete stored file with existing document attachments. Remove the attachments first."
+                )
             db.delete(file_obj)
         else:
             file_obj.deleted_at = datetime.now(timezone.utc)

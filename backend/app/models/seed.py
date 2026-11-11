@@ -13,6 +13,7 @@ INITIAL_ROLE_CODES = (
     "research_admin",
     "grant_admin",
     "university_admin",
+    "superadmin",
 )
 
 
@@ -21,7 +22,9 @@ def seed_initial_roles(session: Session) -> None:
 
     This helper is intentionally not called during application import or FastAPI
     startup. Privileged roles are reference data and must still be assigned by
-    an authorized workflow.
+    an authorized workflow. ``superadmin`` is seeded so the cross-tenant bypass
+    in ``core/dependencies.py`` can be exercised once the role is assigned to
+    a user, but seeding does not grant it to anyone.
     """
 
     existing_codes = set(session.scalars(select(Role.code)).all())

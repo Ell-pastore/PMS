@@ -15,7 +15,7 @@ from ..controller.organization import (
     StaffProfileController,
     StudentProfileController,
 )
-from ..core.dependencies import TenantContext, get_db, get_tenant_context
+from ..core.dependencies import TenantContext, get_db, get_tenant_context, require_roles
 from ..core.pagination import PaginatedResponse, PaginationParams
 from ..schemas.organization import (
     DepartmentCreate,
@@ -48,6 +48,7 @@ def create_faculty(
     data: FacultyCreate,
     db: Session = Depends(get_db),
     tenant: TenantContext = Depends(get_tenant_context),
+    _admin: TenantContext = Depends(require_roles("university_admin")),
 ):
     return FacultyController.create_faculty(db, tenant, data)
 
@@ -79,6 +80,7 @@ def update_faculty(
     data: FacultyUpdate,
     db: Session = Depends(get_db),
     tenant: TenantContext = Depends(get_tenant_context),
+    _admin: TenantContext = Depends(require_roles("university_admin")),
 ):
     return FacultyController.update_faculty(db, tenant, faculty_id, data)
 
@@ -88,6 +90,7 @@ def delete_faculty(
     faculty_id: int,
     db: Session = Depends(get_db),
     tenant: TenantContext = Depends(get_tenant_context),
+    _admin: TenantContext = Depends(require_roles("university_admin")),
 ):
     return FacultyController.delete_faculty(db, tenant, faculty_id)
 
@@ -98,6 +101,7 @@ def create_department(
     data: DepartmentCreate,
     db: Session = Depends(get_db),
     tenant: TenantContext = Depends(get_tenant_context),
+    _admin: TenantContext = Depends(require_roles("department_head", "university_admin")),
 ):
     return DepartmentController.create_department(db, tenant, data)
 
@@ -132,6 +136,7 @@ def update_department(
     data: DepartmentUpdate,
     db: Session = Depends(get_db),
     tenant: TenantContext = Depends(get_tenant_context),
+    _admin: TenantContext = Depends(require_roles("department_head", "university_admin")),
 ):
     return DepartmentController.update_department(db, tenant, department_id, data)
 
@@ -141,6 +146,7 @@ def delete_department(
     department_id: int,
     db: Session = Depends(get_db),
     tenant: TenantContext = Depends(get_tenant_context),
+    _admin: TenantContext = Depends(require_roles("department_head", "university_admin")),
 ):
     return DepartmentController.delete_department(db, tenant, department_id)
 
@@ -151,6 +157,7 @@ def appoint_leadership(
     data: DepartmentLeadershipCreate,
     db: Session = Depends(get_db),
     tenant: TenantContext = Depends(get_tenant_context),
+    _admin: TenantContext = Depends(require_roles("department_head", "university_admin")),
 ):
     return DepartmentLeadershipController.appoint_leadership(db, tenant, data)
 
@@ -183,6 +190,7 @@ def end_leadership(
     data: DepartmentLeadershipEnd,
     db: Session = Depends(get_db),
     tenant: TenantContext = Depends(get_tenant_context),
+    _admin: TenantContext = Depends(require_roles("department_head", "university_admin")),
 ):
     return DepartmentLeadershipController.end_leadership(db, tenant, leadership_id, data)
 
@@ -192,6 +200,7 @@ def delete_leadership(
     leadership_id: uuid.UUID,
     db: Session = Depends(get_db),
     tenant: TenantContext = Depends(get_tenant_context),
+    _admin: TenantContext = Depends(require_roles("department_head", "university_admin")),
 ):
     return DepartmentLeadershipController.delete_leadership(db, tenant, leadership_id)
 

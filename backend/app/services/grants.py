@@ -6,7 +6,7 @@ import uuid
 from datetime import datetime, timezone
 from typing import Optional, Sequence
 
-from sqlalchemy import or_, select
+from sqlalchemy import delete, func, or_, select
 from sqlalchemy.orm import Session
 
 from ..core.exceptions import (
@@ -305,6 +305,27 @@ class GrantApplicationService:
         app = GrantApplicationService.get_application(db, university_id, application_id)
         if app.status != "draft":
             raise SpecializedOperationError(f"Cannot delete grant application in status '{app.status}'. Only draft applications can be deleted.")
+
+        # Guard against deleting an application that still has user-created
+        # data or has been awarded (RESTRICT foreign keys would otherwise
+        # surface as a raw integrity error).
+        blockers: list[str] = []
+        if db.scalar(select(func.count()).select_from(GrantAward).where(GrantAward.application_id == app.id)):
+            blockers.append("an award")
+        if db.scalar(select(func.count()).select_from(GrantApplicationParticipant).where(GrantApplicationParticipant.application_id == app.id)):
+            blockers.append("participants")
+        if db.scalar(select(func.count()).select_from(GrantApplicationReview).where(GrantApplicationReview.application_id == app.id)):
+            blockers.append("reviews")
+        if blockers:
+            raise SpecializedOperationError(
+                f"Cannot delete grant application with existing {', '.join(blockers)}. Remove them first."
+            )
+
+        # Cascade the application's own status history rows (written
+        # automatically at creation), then delete in a single transaction.
+        db.execute(
+            delete(GrantApplicationStatusHistory).where(GrantApplicationStatusHistory.application_id == app.id)
+        )
         db.delete(app)
         db.commit()
 
@@ -600,6 +621,17 @@ class GrantAwardService:
     @staticmethod
     def delete_award(db: Session, university_id: uuid.UUID, award_id: uuid.UUID) -> None:
         award = GrantAwardService.get_award(db, university_id, award_id)
+        blockers: list[str] = []
+        if db.scalar(select(func.count()).select_from(GrantExpenditure).where(GrantExpenditure.award_id == award.id)):
+            blockers.append("expenditures")
+        if db.scalar(select(func.count()).select_from(GrantProjectAllocation).where(GrantProjectAllocation.award_id == award.id)):
+            blockers.append("project allocations")
+        if db.scalar(select(func.count()).select_from(GrantProgressReport).where(GrantProgressReport.award_id == award.id)):
+            blockers.append("progress reports")
+        if blockers:
+            raise SpecializedOperationError(
+                f"Cannot delete grant award with existing {', '.join(blockers)}. Remove them first."
+            )
         db.delete(award)
         db.commit()
 

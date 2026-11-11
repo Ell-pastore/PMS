@@ -6,7 +6,7 @@ import uuid
 from datetime import datetime, timezone
 from typing import Optional, Sequence
 
-from sqlalchemy import func, or_, select
+from sqlalchemy import delete, func, or_, select
 from sqlalchemy.orm import Session
 
 from ..core.exceptions import (
@@ -164,6 +164,41 @@ class ApprovalWorkflowService:
     @staticmethod
     def delete_workflow(db: Session, university_id: uuid.UUID, workflow_id: uuid.UUID) -> None:
         wf = ApprovalWorkflowService.get_workflow(db, university_id, workflow_id)
+
+        # Guard against deleting a workflow that has run (or could run) against
+        # real entities, or whose published versions are immutable by design.
+        if db.scalar(
+            select(func.count()).select_from(ApprovalInstance).where(ApprovalInstance.workflow_id == wf.id)
+        ):
+            raise SpecializedOperationError(
+                "Cannot delete approval workflow with existing instances. Instances are part of the audit trail."
+            )
+        if db.scalar(
+            select(func.count())
+            .select_from(ApprovalWorkflowVersion)
+            .where(
+                ApprovalWorkflowVersion.workflow_id == wf.id,
+                ApprovalWorkflowVersion.publication_state == "published",
+            )
+        ):
+            raise SpecializedOperationError(
+                "Cannot delete approval workflow with published versions. Published versions are immutable."
+            )
+
+        # Cascade the workflow's draft versions and their steps (the workflow
+        # definition is one unit), then delete the workflow in one transaction.
+        draft_version_ids = db.scalars(
+            select(ApprovalWorkflowVersion.id).where(
+                ApprovalWorkflowVersion.workflow_id == wf.id,
+                ApprovalWorkflowVersion.university_id == university_id,
+            )
+        ).all()
+        if draft_version_ids:
+            db.execute(
+                delete(ApprovalWorkflowStep).where(ApprovalWorkflowStep.workflow_version_id.in_(draft_version_ids))
+            )
+            db.execute(delete(ApprovalWorkflowVersion).where(ApprovalWorkflowVersion.id.in_(draft_version_ids)))
+
         # Clear active_version_id first to break cyclic foreign key constraint
         wf.active_version_id = None
         db.flush()
@@ -262,7 +297,16 @@ class ApprovalVersionService:
         version = ApprovalVersionService.get_version(db, university_id, workflow_id, version_id)
         if version.publication_state == "published":
             raise SpecializedOperationError("Cannot delete a published workflow version. Published versions are immutable.")
+        if db.scalar(
+            select(func.count()).select_from(ApprovalInstance).where(ApprovalInstance.workflow_version_id == version.id)
+        ):
+            raise SpecializedOperationError(
+                "Cannot delete workflow version with existing instances. Instances are part of the audit trail."
+            )
 
+        # Cascade the version's steps (the version definition is one unit),
+        # then delete the version in a single transaction.
+        db.execute(delete(ApprovalWorkflowStep).where(ApprovalWorkflowStep.workflow_version_id == version.id))
         db.delete(version)
         db.commit()
 
@@ -403,6 +447,10 @@ class ApprovalStepService:
             raise SpecializedOperationError("Cannot delete steps from a published workflow version. Published versions are immutable.")
 
         step = ApprovalStepService.get_step(db, university_id, workflow_id, version_id, step_id)
+        if db.scalar(select(func.count()).select_from(ApprovalAction).where(ApprovalAction.step_id == step.id)):
+            raise SpecializedOperationError(
+                "Cannot delete workflow step with existing approval actions. Actions are part of the audit trail."
+            )
         db.delete(step)
         db.commit()
 

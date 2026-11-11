@@ -6,10 +6,10 @@ This file provides instructions for AI coding agents working on the PMS (Project
 
 PMS is a **backend-only** university project management system built with FastAPI, SQLAlchemy, and PostgreSQL. It manages student research proposals, projects, grants, publications, progress monitoring, and approval workflows with multi-tenant (per-university) isolation.
 
-- **Entry point**: `backend/app/main.py` — creates the FastAPI app, registers exception handlers, includes the v1 API router, exposes `/health`.
+- **Entry point**: `backend/app/main.py` — creates the FastAPI app, registers exception handlers, includes the v1 API router, exposes `/health`. Runnable via `python -m backend.app.main` (not `python backend/app/main.py` — package-relative imports require module execution).
 - **API root**: `/api/v1` (37 routers, ~120 OpenAPI paths across 12 domains).
 - **Test command**: `PMS_TEST_DATABASE_URL='postgresql+psycopg://apple@127.0.0.1:5433/pms_test_db' .venv/bin/python -m pytest backend/tests -q`
-- **Run command**: `uvicorn backend.app.main:app --reload` (requires `DATABASE_URL` in `.env` or environment).
+- **Run command**: `uvicorn backend.app.main:app --reload` or `python -m backend.app.main` (requires `DATABASE_URL` in `.env` or environment).
 
 ## 2. Technology Stack
 
@@ -75,9 +75,11 @@ PMS/
 │   │   │   └── (one file per domain)
 │   │   └── __init__.py
 │   ├── tests/
-│   │   ├── conftest.py             # DB fixtures, test helpers
+│   │   ├── conftest.py             # DB fixtures, test helpers (incl. assign_role_helper)
 │   │   ├── test_api_auth_and_security.py
 │   │   ├── test_api_tenant_isolation.py
+│   │   ├── test_delete_guards.py
+│   │   ├── test_domain_rbac.py
 │   │   ├── test_models.py
 │   │   ├── test_postgres_integrity.py
 │   │   ├── test_schema_integrity.py
@@ -228,9 +230,20 @@ Static routes must be declared **before** dynamic parameterized routes on the sa
 
 - `get_tenant_context`: Requires `X-University-ID` header; verifies university exists and is active; loads active user roles for that university; verifies active `UniversityMembership` (superadmin exempt).
 - `require_roles(*role_codes)`: FastAPI dependency factory; user must hold at least one of the listed roles, or be `superadmin`.
-- **Admin routes** (`universities`, `roles`, `permissions`, `users list`) require `university_admin`.
+- **Admin routes** (`universities`, `roles`, `permissions`, `users list`, memberships, settings, user-role assignment) require `university_admin`.
+- **Domain mutations** are gated by their matching domain role:
+  - Faculties → `university_admin`.
+  - Departments + department leadership → `department_head` or `university_admin`.
+  - Research topics, duplicate-candidate review, approval workflows/versions/steps, audit logs, retention policies, milestone templates → `research_admin` or `university_admin`.
+  - Grant opportunities, awards, allocations, expenditures → `grant_admin` or `university_admin`.
+- Reads and collaborative research routes (proposals, projects, milestones, progress reports, publications, grant applications, notifications, files, profiles) are open to any active member.
 - **Self-access**: `GET/PATCH /users/{id}` allows the user to access their own profile without admin role; accessing another user's profile requires `university_admin`.
-- `superadmin` is referenced in code but **not seeded** — it must be manually assigned if needed.
+- `superadmin` is seeded with the other reference roles (`INITIAL_ROLE_CODES`) but granted to no one — it must be manually assigned to take effect.
+
+### Delete Guards
+
+- Services raise `SpecializedOperationError` (400, `RESTRICTED_OPERATION`) when deleting an entity still referenced by user-created child data; the message lists the blockers.
+- Machine-derived bookkeeping rows (status history, draft workflow versions/steps, account verification tokens) are cascaded in the same transaction.
 
 ### Never Do
 
@@ -304,7 +317,7 @@ PMS_TEST_DATABASE_URL='postgresql+psycopg://apple@127.0.0.1:5433/pms_test_db' \
 - Use `.venv/bin/python` (system python lacks dependencies).
 - Do not change production semantics just to pass tests.
 - Add tests for new CRUD, search, filtering, pagination, authorization, tenant isolation, and invalid requests.
-- Existing suite: 62 passed, 0 failed (do not regress).
+- Existing suite: 98 passed, 0 failed (do not regress).
 
 ## 12. Security Requirements
 
@@ -312,10 +325,10 @@ PMS_TEST_DATABASE_URL='postgresql+psycopg://apple@127.0.0.1:5433/pms_test_db' \
 - Tokens: HMAC-SHA256 signed, 24-hour expiry (never unsigned or never-expiring).
 - `SECRET_KEY` default is insecure ("pms-insecure-development-secret-key-replace-in-prod") — must be changed in production via environment.
 - All university-scoped routes require tenant context (authentication + membership).
-- Role-based access on global admin routes (`require_roles`).
+- Role-based access on admin and gated domain mutation routes (`require_roles`).
 - Cross-tenant access returns 404 (no existence leakage).
 - Structured error responses (no internals leaked).
-- `superadmin` bypass exists but role is not seeded.
+- `superadmin` bypass exists in `require_roles`/`has_role`; role is seeded as reference data (assigned to no one).
 
 ## 13. Git Workflow
 
@@ -328,6 +341,9 @@ PMS_TEST_DATABASE_URL='postgresql+psycopg://apple@127.0.0.1:5433/pms_test_db' \
 ```bash
 # Run the API (development)
 uvicorn backend.app.main:app --reload
+
+# Run the API as a module
+python -m backend.app.main
 
 # Run tests
 PMS_TEST_DATABASE_URL='postgresql+psycopg://apple@127.0.0.1:5433/pms_test_db' \

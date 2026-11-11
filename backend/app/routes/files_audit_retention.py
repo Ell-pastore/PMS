@@ -14,7 +14,7 @@ from ..controller.files_audit_retention import (
     RetentionPolicyController,
     StoredFileController,
 )
-from ..core.dependencies import TenantContext, get_db, get_tenant_context
+from ..core.dependencies import TenantContext, get_db, get_tenant_context, require_roles
 from ..core.pagination import PaginatedResponse, PaginationParams
 from ..schemas.files_audit_retention import (
     AuditLogCreate,
@@ -153,6 +153,7 @@ def create_log(
     data: AuditLogCreate,
     db: Session = Depends(get_db),
     tenant: TenantContext = Depends(get_tenant_context),
+    _admin: TenantContext = Depends(require_roles("research_admin", "university_admin")),
 ):
     return AuditLogController.create_log(db, tenant, data)
 
@@ -193,6 +194,7 @@ def update_log(
     log_id: uuid.UUID,
     db: Session = Depends(get_db),
     tenant: TenantContext = Depends(get_tenant_context),
+    _admin: TenantContext = Depends(require_roles("research_admin", "university_admin")),
 ):
     AuditLogController.update_log(db, tenant, log_id)
 
@@ -202,6 +204,7 @@ def delete_log(
     log_id: uuid.UUID,
     db: Session = Depends(get_db),
     tenant: TenantContext = Depends(get_tenant_context),
+    _admin: TenantContext = Depends(require_roles("research_admin", "university_admin")),
 ):
     AuditLogController.delete_log(db, tenant, log_id)
 
@@ -212,6 +215,7 @@ def create_policy(
     data: RetentionPolicyCreate,
     db: Session = Depends(get_db),
     tenant: TenantContext = Depends(get_tenant_context),
+    _admin: TenantContext = Depends(require_roles("research_admin", "university_admin")),
 ):
     return RetentionPolicyController.create_policy(db, tenant, data)
 
@@ -250,6 +254,7 @@ def update_policy(
     data: RetentionPolicyUpdate,
     db: Session = Depends(get_db),
     tenant: TenantContext = Depends(get_tenant_context),
+    _admin: TenantContext = Depends(require_roles("research_admin", "university_admin")),
 ):
     return RetentionPolicyController.update_policy(db, tenant, policy_id, data)
 
@@ -259,6 +264,7 @@ def delete_policy(
     policy_id: uuid.UUID,
     db: Session = Depends(get_db),
     tenant: TenantContext = Depends(get_tenant_context),
+    _admin: TenantContext = Depends(require_roles("research_admin", "university_admin")),
 ):
     return RetentionPolicyController.delete_policy(db, tenant, policy_id)
 

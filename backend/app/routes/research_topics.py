@@ -12,7 +12,7 @@ from ..controller.research_topics import (
     DuplicateCandidateController,
     ResearchTopicController,
 )
-from ..core.dependencies import TenantContext, get_db, get_tenant_context
+from ..core.dependencies import TenantContext, get_db, get_tenant_context, require_roles
 from ..core.pagination import PaginatedResponse, PaginationParams
 from ..schemas.research_topics import (
     DuplicateCandidateCreate,
@@ -33,6 +33,7 @@ def create_topic(
     data: ResearchTopicCreate,
     db: Session = Depends(get_db),
     tenant: TenantContext = Depends(get_tenant_context),
+    _admin: TenantContext = Depends(require_roles("research_admin", "university_admin")),
 ):
     return ResearchTopicController.create_topic(db, tenant, data)
 
@@ -67,6 +68,7 @@ def update_topic(
     data: ResearchTopicUpdate,
     db: Session = Depends(get_db),
     tenant: TenantContext = Depends(get_tenant_context),
+    _admin: TenantContext = Depends(require_roles("research_admin", "university_admin")),
 ):
     return ResearchTopicController.update_topic(db, tenant, topic_id, data)
 
@@ -76,6 +78,7 @@ def delete_topic(
     topic_id: uuid.UUID,
     db: Session = Depends(get_db),
     tenant: TenantContext = Depends(get_tenant_context),
+    _admin: TenantContext = Depends(require_roles("research_admin", "university_admin")),
 ):
     return ResearchTopicController.delete_topic(db, tenant, topic_id)
 
@@ -117,6 +120,7 @@ def review_candidate(
     data: DuplicateCandidateReview,
     db: Session = Depends(get_db),
     tenant: TenantContext = Depends(get_tenant_context),
+    _admin: TenantContext = Depends(require_roles("research_admin", "university_admin")),
 ):
     return DuplicateCandidateController.review_candidate(db, tenant, candidate_id, data)
 

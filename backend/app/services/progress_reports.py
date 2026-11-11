@@ -6,7 +6,7 @@ import uuid
 from datetime import datetime, timezone
 from typing import Optional, Sequence
 
-from sqlalchemy import or_, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
 from ..core.exceptions import (
@@ -183,6 +183,18 @@ class ProgressReportService:
         report = ProgressReportService.get_report(db, university_id, report_id)
         if report.status != "draft":
             raise SpecializedOperationError(f"Cannot delete progress report in status '{report.status}'. Only draft reports can be deleted.")
+
+        blockers: list[str] = []
+        if db.scalar(
+            select(func.count()).select_from(ProgressReportReview).where(ProgressReportReview.report_id == report.id)
+        ):
+            blockers.append("reviews")
+        if db.scalar(select(func.count()).select_from(ProjectComment).where(ProjectComment.progress_report_id == report.id)):
+            blockers.append("comments")
+        if blockers:
+            raise SpecializedOperationError(
+                f"Cannot delete progress report with existing {', '.join(blockers)}. Remove them first."
+            )
         db.delete(report)
         db.commit()
 

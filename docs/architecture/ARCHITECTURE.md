@@ -257,8 +257,9 @@ From `backend/app/models/seed.py` (`INITIAL_ROLE_CODES`):
 - `research_admin`
 - `grant_admin`
 - `university_admin`
+- `superadmin`
 
-Note: `superadmin` is referenced in `dependencies.py` as a bypass but is **not seeded**.
+Note: `superadmin` is seeded as reference data only — seeding grants it to no one; it must be manually assigned for the bypass in `dependencies.py` to take effect.
 
 ### Authorization Flow
 
@@ -480,20 +481,19 @@ PMS does **not** integrate with external services in the current implementation:
 | 404 for cross-tenant access | Avoids leaking resource existence to unauthorized tenants |
 | Custom HMAC-SHA256 tokens (not PyJWT) | No extra dependency; stdlib-only implementation |
 | Hard deletes (no soft delete) | Simplicity; some tables have `deleted_at` columns but services don't use them |
-| Global RBAC only on admin routes | Domain routes rely on tenant isolation; avoids inventing authorization rules not in the seeded role semantics |
+| RBAC on admin + domain mutation routes | Reads stay member-open; mutations gated by matching domain role |
 | Paginated envelope on all list endpoints | Consistent API shape for clients |
 
 ## 15. Known Architectural Gaps
 
 | Gap | Description | Impact |
 |-----|-------------|--------|
-| Domain-level RBAC | Only global `university_admin` routes are role-protected; domain routes rely solely on tenant isolation | No granular control (e.g., `grant_admin` cannot be restricted to grant routes) |
-| `superadmin` not seeded | `superadmin` bypass exists in code but no role row is created | Superadmin must be manually assigned via direct DB insert |
-| Most delete operations unguarded | Only 4 domains (topic, faculty, department, grant opportunity) have `SpecializedOperationError` delete guards; others rely on DB RESTRICT constraints | Delete failures return raw DB errors instead of structured messages |
 | No frontend | Backend-only API | API consumers must build their own client |
 | No notification delivery | Preferences stored but no email/SMS/push provider | Notifications are stored but not delivered |
 | No scheduled jobs | Alert rules defined but no scheduler/evaluator | Alerts are not automatically generated |
-| No soft deletion | Hard `db.delete()` used throughout | Deleted data is not recoverable |
+| No soft deletion | Hard `db.delete()` used throughout (guarded by service-level checks) | Deleted data is not recoverable |
+
+Previously listed and now resolved: domain-level RBAC (mutations gated by matching domain role), `superadmin` seeding (reference data, granted to no one), and delete guards (structured `SpecializedOperationError` across all domains).
 
 ## 16. Related Documents
 

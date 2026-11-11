@@ -119,4 +119,5 @@ def test_key_relationship_cardinality_and_seed_roles() -> None:
         "research_admin",
         "grant_admin",
         "university_admin",
+        "superadmin",
     )

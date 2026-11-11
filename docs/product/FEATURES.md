@@ -29,8 +29,8 @@ PMS is a backend-only API for managing university research activities. Features 
 | Role CRUD | Create, read, update, delete roles (admin-restricted) | Implemented |
 | Permission CRUD | Create, read permissions (admin-restricted) | Implemented |
 | Role-permission assignment | Assign/remove permissions to/from roles | Implemented |
-| Seeded role codes | student, supervisor, department_head, research_admin, grant_admin, university_admin | Defined in `seed.py` |
-| `superadmin` bypass | Referenced in code but not seeded | Referenced only |
+| Seeded role codes | student, supervisor, department_head, research_admin, grant_admin, university_admin, superadmin | Defined in `seed.py` |
+| `superadmin` bypass | Seeded as reference data; granted to no one until manually assigned | Implemented |
 
 ### 3. User Roles (Tenant)
 
@@ -61,12 +61,12 @@ PMS is a backend-only API for managing university research activities. Features 
 
 | Feature | Description | Status |
 |---------|-------------|--------|
-| Faculty CRUD | Create, read, update, delete faculties | Implemented |
-| Department CRUD | Create, read, update, delete departments | Implemented |
-| Department leadership | Appoint/end department heads (one active leader per department) | Implemented |
+| Faculty CRUD | Create, read, update, delete faculties (mutations: `university_admin`) | Implemented |
+| Department CRUD | Create, read, update, delete departments (mutations: `department_head`/`university_admin`) | Implemented |
+| Department leadership | Appoint/end department heads (one active leader per department; `department_head`/`university_admin`) | Implemented |
 | Staff profiles | Create, read, update, delete staff profiles | Implemented |
 | Student profiles | Create, read, update, delete student profiles | Implemented |
-| Delete guards | Faculty blocked if departments exist; department blocked if referenced | Implemented (4 domains) |
+| Delete guards | Blocked (400 `RESTRICTED_OPERATION`) when user-created child data exists; machine-derived rows (status history, draft workflow versions) cascade | Implemented (all domains) |
 
 ### 7. Research Topics
 
@@ -187,7 +187,7 @@ PMS is a backend-only API for managing university research activities. Features 
 | Category | Implemented | Partially Implemented | Not Implemented |
 |----------|-------------|----------------------|-----------------|
 | Users & Auth | ✅ | Email verification | — |
-| Roles & Permissions | ✅ | — | superadmin seeding |
+| Roles & Permissions | ✅ | — | — |
 | User Roles (Tenant) | ✅ | — | — |
 | Universities | ✅ | — | — |
 | Organization | ✅ | — | — |

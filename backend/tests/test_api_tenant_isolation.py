@@ -11,6 +11,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
 from backend.tests.conftest import (
+    assign_role_helper,
     create_membership_helper,
     create_university_helper,
     create_user_helper,
@@ -23,13 +24,20 @@ from backend.tests.conftest import (
 # ---------------------------------------------------------------------------
 
 def _setup_two_tenants(db: Session):
-    """Create two users each in their own university. Returns (user_a, univ_a, user_b, univ_b)."""
+    """Create two users each in their own university. Returns (user_a, univ_a, user_b, univ_b).
+
+    Both users hold ``university_admin`` in their own tenant so gated setup
+    calls (faculties, departments, topics) succeed; isolation assertions must
+    still hold even for admins.
+    """
     user_a = create_user_helper(db)
     user_b = create_user_helper(db)
     univ_a = create_university_helper(db)
     univ_b = create_university_helper(db)
     create_membership_helper(db, univ_a.id, user_a.id)
     create_membership_helper(db, univ_b.id, user_b.id)
+    assign_role_helper(db, univ_a.id, user_a.id, "university_admin")
+    assign_role_helper(db, univ_b.id, user_b.id, "university_admin")
     return user_a, univ_a, user_b, univ_b
 
 

@@ -6,7 +6,7 @@ import uuid
 from datetime import datetime, timezone
 from typing import Optional, Sequence
 
-from sqlalchemy import func, or_, select
+from sqlalchemy import delete, func, or_, select
 from sqlalchemy.orm import Session
 
 from ..core.exceptions import (
@@ -14,6 +14,7 @@ from ..core.exceptions import (
     ForbiddenError,
     ForeignKeyViolationError,
     NotFoundError,
+    SpecializedOperationError,
     UnauthorizedError,
 )
 from ..core.pagination import PaginationParams, paginate
@@ -24,6 +25,8 @@ from ..models import (
     Permission,
     Role,
     RolePermission,
+    StaffProfile,
+    StudentProfile,
     UniversityMembership,
     User,
     UserRole,
@@ -116,6 +119,28 @@ class UserService:
     @staticmethod
     def delete_user(db: Session, user_id: int) -> None:
         user = UserService.get_user_by_id(db, user_id)
+
+        # Guard against deleting an account that still holds tenant data
+        # (RESTRICT foreign keys would otherwise surface as a raw integrity
+        # error). Historical activity such as audit log entries keeps the
+        # account retained by design.
+        blockers: list[str] = []
+        if db.scalar(select(func.count()).select_from(UniversityMembership).where(UniversityMembership.user_id == user.id)):
+            blockers.append("university memberships")
+        if db.scalar(select(func.count()).select_from(UserRole).where(or_(UserRole.user_id == user.id, UserRole.assigned_by_id == user.id))):
+            blockers.append("role assignments")
+        if db.scalar(select(func.count()).select_from(StaffProfile).where(StaffProfile.user_id == user.id)):
+            blockers.append("staff profiles")
+        if db.scalar(select(func.count()).select_from(StudentProfile).where(StudentProfile.user_id == user.id)):
+            blockers.append("student profiles")
+        if blockers:
+            raise SpecializedOperationError(
+                f"Cannot delete user with existing {', '.join(blockers)}. Remove them first."
+            )
+
+        # Cascade machine-generated verification tokens, then delete the
+        # account in a single transaction.
+        db.execute(delete(AccountVerification).where(AccountVerification.user_id == user.id))
         db.delete(user)
         db.commit()
 
@@ -178,6 +203,15 @@ class RoleService:
     @staticmethod
     def delete_role(db: Session, role_id: int) -> None:
         role = RoleService.get_role(db, role_id)
+        blockers: list[str] = []
+        if db.scalar(select(func.count()).select_from(UserRole).where(UserRole.role_id == role.id)):
+            blockers.append("user role assignments")
+        if db.scalar(select(func.count()).select_from(RolePermission).where(RolePermission.role_id == role.id)):
+            blockers.append("permission assignments")
+        if blockers:
+            raise SpecializedOperationError(
+                f"Cannot delete role with existing {', '.join(blockers)}. Remove them first."
+            )
         db.delete(role)
         db.commit()
 

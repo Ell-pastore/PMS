@@ -153,6 +153,40 @@ def make_auth_headers(
     return headers
 
 
+def assign_role_helper(db: Session, university_id: uuid.UUID, user_id: int, role_code: str) -> UserRole:
+    """Assign a role (reference data, upserted by code) to a user in a university.
+
+    Idempotent: an already-assigned (non-revoked) role returns the existing
+    UserRole row instead of creating a duplicate.
+    """
+    role = db.scalar(select(Role).where(Role.code == role_code))
+    if not role:
+        role = Role(code=role_code, name=role_code.replace("_", " ").title())
+        db.add(role)
+        db.flush()
+
+    existing = db.scalar(
+        select(UserRole).where(
+            UserRole.university_id == university_id,
+            UserRole.user_id == user_id,
+            UserRole.role_id == role.id,
+            UserRole.revoked_at.is_(None),
+        )
+    )
+    if existing:
+        return existing
+
+    assignment = UserRole(
+        university_id=university_id,
+        user_id=user_id,
+        role_id=role.id,
+    )
+    db.add(assignment)
+    db.commit()
+    db.refresh(assignment)
+    return assignment
+
+
 def create_university_admin_helper(
     db: Session,
     email: str | None = None,
@@ -166,20 +200,6 @@ def create_university_admin_helper(
     user = create_user_helper(db, email=email, full_name=full_name)
     univ = create_university_helper(db, name=university_name)
     create_membership_helper(db, univ.id, user.id)
-
-    role = db.scalar(select(Role).where(Role.code == "university_admin"))
-    if not role:
-        role = Role(code="university_admin", name="University Admin")
-        db.add(role)
-        db.flush()
-
-    db.add(
-        UserRole(
-            university_id=univ.id,
-            user_id=user.id,
-            role_id=role.id,
-        )
-    )
-    db.commit()
+    assign_role_helper(db, univ.id, user.id, "university_admin")
     headers = make_auth_headers(user, univ.id)
     return user, univ, headers

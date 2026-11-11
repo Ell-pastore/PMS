@@ -6,7 +6,7 @@ import uuid
 from datetime import datetime, timezone
 from typing import Optional, Sequence
 
-from sqlalchemy import func, or_, select
+from sqlalchemy import delete, func, or_, select
 from sqlalchemy.orm import Session
 
 from ..core.exceptions import (
@@ -24,6 +24,7 @@ from ..models import (
     ProposalStatusHistory,
     ProposalSupervisor,
     ResearchProposal,
+    ResearchProject,
     ResearchTopic,
     StaffProfile,
     StudentProfile,
@@ -191,6 +192,29 @@ class ResearchProposalService:
         proposal = ResearchProposalService.get_proposal(db, university_id, proposal_id)
         if proposal.status != "draft":
             raise SpecializedOperationError(f"Cannot delete proposal in status '{proposal.status}'. Only draft proposals can be deleted.")
+
+        # Guard against deleting a proposal that still has user-created data or
+        # has been promoted to a project (RESTRICT foreign keys would otherwise
+        # surface as a raw integrity error).
+        blockers: list[str] = []
+        if db.scalar(select(func.count()).select_from(ResearchProject).where(ResearchProject.proposal_id == proposal.id)):
+            blockers.append("a linked research project")
+        if db.scalar(select(func.count()).select_from(ProposalRevision).where(ProposalRevision.proposal_id == proposal.id)):
+            blockers.append("revisions")
+        if db.scalar(select(func.count()).select_from(ProposalParticipant).where(ProposalParticipant.proposal_id == proposal.id)):
+            blockers.append("participants")
+        if db.scalar(select(func.count()).select_from(ProposalSupervisor).where(ProposalSupervisor.proposal_id == proposal.id)):
+            blockers.append("supervisors")
+        if db.scalar(select(func.count()).select_from(ProposalReview).where(ProposalReview.proposal_id == proposal.id)):
+            blockers.append("reviews")
+        if blockers:
+            raise SpecializedOperationError(
+                f"Cannot delete proposal with existing {', '.join(blockers)}. Remove them first."
+            )
+
+        # Cascade the proposal's own status history rows (written automatically
+        # at creation), then delete the proposal in a single transaction.
+        db.execute(delete(ProposalStatusHistory).where(ProposalStatusHistory.proposal_id == proposal.id))
         db.delete(proposal)
         db.commit()
 
